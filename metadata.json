@@ -1,0 +1,10 @@
+{
+  "name": "الخبير الذكي",
+  "description": "نظام Voice Agent متكامل، مساعد صوتي إداري ذكي يعتمد على Realtime API و WebRTC لمحادثات صوتية مباشرة، سريعة، ويمكن مقاطعتها.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,1 @@
+# Store ONNX model directly in Git (file is under GitHub's 100 MB per-file limit).\n*.onnx -filter -diff -merge -text\n
