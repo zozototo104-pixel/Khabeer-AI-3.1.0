@@ -37,29 +37,33 @@ const upload = multer({
 // (e.g. file too large) propagates as an unhandled Express error and the
 // client receives a generic HTTP 500 HTML page with the full Node stack
 // trace, which leaks internal file paths and middleware names.
-export function multerErrorHandler(err: any, _req: any, res: any, next: any) {
+export function multerErrorHandler(err: any, req: any, res: any, next: any) {
   if (!err) return next();
   if (err.name === 'MulterError' || err.code === 'LIMIT_FILE_SIZE' || err.code === 'LIMIT_FILE_COUNT') {
     const isTooLarge = err.code === 'LIMIT_FILE_SIZE' || /too large/i.test(err.message || '');
     const isTooMany = err.code === 'LIMIT_FILE_COUNT' || /file count/i.test(err.message || '');
     if (isTooLarge) {
+      logKnowledgeMultipartError(req, 'FILE_TOO_LARGE');
       return res.status(413).json({
         code: 'FILE_TOO_LARGE',
         error: 'حجم الملف يتجاوز الحد المسموح (100 MB). جرّب تقسيم الملف أو ضغطه.',
       });
     }
     if (isTooMany) {
+      logKnowledgeMultipartError(req, 'TOO_MANY_FILES');
       return res.status(400).json({
         code: 'TOO_MANY_FILES',
         error: 'يمكن رفع ملف واحد فقط في كل طلب.',
       });
     }
+    logKnowledgeMultipartError(req, 'UPLOAD_ERROR');
     return res.status(400).json({
       code: 'UPLOAD_ERROR',
       error: err.message || 'خطأ في رفع الملف.',
     });
   }
   // Non-multer error: let Express default handler deal with it.
+  logKnowledgeMultipartError(req, 'UPLOAD_UNEXPECTED_ERROR');
   console.error('Unexpected upload error:', err);
   return res.status(500).json({ error: 'UPLOAD_UNEXPECTED_ERROR' });
 }
@@ -73,7 +77,16 @@ import { validateViolationInput } from './server/services/risk/RiskViolationServ
 import { buildTwilioStreamTwiml, getConsultationCapabilities, issueConsultationToken, pcm24kBase64ToTwilioMuLaw8k, twilioMuLaw8kToPcm16kBase64, verifyConsultationToken } from './server/services/integrations/ConsultationChannelService.ts';
 import { createDirectSessionToken, verifyDirectSessionToken } from './src/lib/direct-auth.ts';
 import { assessDocumentTextQuality, buildPdfPageRanges } from './server/services/knowledge/DocumentTextQuality.ts';
-import { extractNativeDocumentText, isSupportedKnowledgeFile } from './server/services/knowledge/DocumentIngestionService.ts';
+import {
+  extractNativeDocumentText,
+  isSupportedKnowledgeFile,
+  KnowledgeDocumentError,
+} from './server/services/knowledge/DocumentIngestionService.ts';
+import {
+  prepareKnowledgeDocument,
+  runKnowledgeIngestion,
+  type KnowledgeStage,
+} from './server/services/knowledge/KnowledgeIngestionPipeline.ts';
 // P2/P1-2/P1-10 fixes: shared audit / rate-limit / token-revocation services
 import { recordAudit, checkRateLimit, revokeToken, isTokenRevoked } from './server/services/security/AuditService.ts';
 
@@ -460,6 +473,74 @@ function normalizeUploadedFileName(originalName: unknown, encodedName?: unknown)
   }
   const baseName = path.basename(candidate.replace(/\u0000/g, '').replace(/\\/g, '/')).trim();
   return (baseName || 'document').slice(0, 500);
+}
+
+type KnowledgeLogEvent =
+  | 'KnowledgeUpload:START'
+  | 'KnowledgeUpload:RECEIVED'
+  | 'KnowledgeExtract:START'
+  | 'KnowledgeExtract:DONE'
+  | 'KnowledgeNormalize:DONE'
+  | 'KnowledgeIndex:START'
+  | 'KnowledgeIndex:DONE'
+  | 'KnowledgeUpload:SUCCESS'
+  | 'KnowledgeUpload:ERROR';
+
+function beginKnowledgeUpload(req: any, _res: any, next: any): void {
+  req.knowledgeUploadStartedAt = Date.now();
+  next();
+}
+
+function createKnowledgeUploadLogger(file: any, startedAt: number) {
+  const base = {
+    fileName: String(file?.originalname || 'unknown'),
+    mimeType: String(file?.mimetype || 'application/octet-stream'),
+    sizeBytes: Number(file?.buffer?.length || file?.size || 0),
+  };
+  return (event: KnowledgeLogEvent, stage: string, errorCode?: string) => {
+    const payload = {
+      ...base,
+      stage,
+      elapsedMs: event === 'KnowledgeUpload:START' ? 0 : Math.max(0, Date.now() - startedAt),
+      errorCode: errorCode || null,
+    };
+    const method = event === 'KnowledgeUpload:ERROR' ? console.error : console.log;
+    method(`[${event}]`, payload);
+  };
+}
+
+function mapKnowledgeStage(stage: KnowledgeStage): [KnowledgeLogEvent, string] {
+  const stages: Record<KnowledgeStage, [KnowledgeLogEvent, string]> = {
+    extract_start: ['KnowledgeExtract:START', 'extract'],
+    extract_done: ['KnowledgeExtract:DONE', 'extract'],
+    normalize_done: ['KnowledgeNormalize:DONE', 'normalize'],
+    index_start: ['KnowledgeIndex:START', 'persist_and_publish_to_rag'],
+    index_done: ['KnowledgeIndex:DONE', 'persist_and_publish_to_rag'],
+  };
+  return stages[stage];
+}
+
+function getKnowledgePersistenceErrorCode(error: any): string {
+  const postgresCode = String(error?.code || error?.cause?.code || '');
+  if (postgresCode === '42P01' || postgresCode === '42703') return 'KNOWLEDGE_SCHEMA_OUTDATED';
+  if (postgresCode === '23505') return 'KNOWLEDGE_DUPLICATE_FILE_RECORD';
+  if (/DATABASE_UNAVAILABLE/i.test(String(error?.message || ''))) return 'DATABASE_UNAVAILABLE';
+  return 'KNOWLEDGE_PERSIST_FAILED';
+}
+
+function logKnowledgeMultipartError(req: any, errorCode: string): void {
+  if (!String(req?.originalUrl || req?.url || '').startsWith('/api/knowledge')) return;
+  const fileName = normalizeUploadedFileName(
+    req?.file?.originalname || 'unknown',
+    req?.body?.originalName,
+  );
+  const logger = createKnowledgeUploadLogger({
+    originalname: fileName,
+    mimetype: req?.file?.mimetype || 'application/octet-stream',
+    size: Number(req?.file?.size || 0),
+  }, Number(req?.knowledgeUploadStartedAt || Date.now()));
+  logger('KnowledgeUpload:START', 'multipart_upload');
+  logger('KnowledgeUpload:ERROR', 'multipart_upload', errorCode);
 }
 
 async function resolveMeetingInvite(rawToken: string) {
@@ -3083,130 +3164,95 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
     }
   });
 
-  app.post('/api/knowledge', requireAuth, upload.single('file'), multerErrorHandler, async (req: any, res) => {
+  app.post('/api/knowledge', requireAuth, beginKnowledgeUpload, upload.single('file'), multerErrorHandler, async (req: any, res) => {
+    let logKnowledge: ReturnType<typeof createKnowledgeUploadLogger> | null = null;
     try {
       if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-      
-      const org = await resolveOwnedOrganization(req.user.uid, req.body.orgId);
-      if (!org) return res.status(400).json({ error: 'No owned organization found' });
 
       req.file.originalname = normalizeUploadedFileName(req.file.originalname, req.body.originalName);
-      const originalName = req.file.originalname.toLowerCase();
+      const startedAt = Number(req.knowledgeUploadStartedAt || Date.now());
+      logKnowledge = createKnowledgeUploadLogger(req.file, startedAt);
+      logKnowledge('KnowledgeUpload:START', 'multipart_upload');
+      logKnowledge('KnowledgeUpload:RECEIVED', 'multipart_received');
+
+      const org = await resolveOwnedOrganization(req.user.uid, req.body.orgId);
+      if (!org) {
+        logKnowledge('KnowledgeUpload:ERROR', 'organization_scope', 'ORGANIZATION_NOT_FOUND');
+        return res.status(400).json({ code: 'ORGANIZATION_NOT_FOUND', error: 'No owned organization found' });
+      }
+
+      const originalName = req.file.originalname;
       const mimeType = req.file.mimetype;
-      const supportedKnowledgeFile = isSupportedKnowledgeFile(originalName);
-      if (!supportedKnowledgeFile) {
-        return res.status(415).json({ error: 'Unsupported file type. Use PDF, DOCX, XLSX, CSV, TXT, MD, or JSON.' });
-      }
-      const isPdf = originalName.endsWith('.pdf') || mimeType === 'application/pdf';
-      let fullExtractedText = "";
-      let pdfPageCount = 0;
-      
-      try {
-        const native = await extractNativeDocumentText(req.file.buffer, originalName, mimeType);
-        fullExtractedText = native.text;
-        pdfPageCount = native.pageCount;
-      } catch (parseError) {
-        console.error("Local parsing error:", parseError);
-      }
-
-      let content = fullExtractedText;
-      let aiExtractedContent = false;
-      // P0-3 FIX: assess text quality on EVERY uploaded document, not just PDFs.
-      // Mojibake (broken Arabic font maps, replacement chars, private-use glyphs)
-      // can also appear in TXT/MD/CSV/XLSX/DOCX/JSON files when the source was
-      // saved with the wrong encoding. Without this gate, garbled text gets
-      // stored in the knowledge base and later surfaces as "official" citations
-      // in RAG responses, producing hallucinated or wrong regulatory references.
-      const localQuality = assessDocumentTextQuality(content);
-      const localPdfQuality = isPdf ? localQuality : null;
-
-      // For PDFs with broken text, fall back to verified OCR (Gemini) when available.
-      if (isPdf && localPdfQuality && !localPdfQuality.usable) {
-        console.warn('Unsafe local PDF text detected; switching to verified OCR:', {
-          fileName: req.file.originalname,
-          pageCount: pdfPageCount,
-          reason: localPdfQuality.reason,
-          metrics: localPdfQuality.metrics,
-        });
-        try {
-          content = await extractPdfWithVerifiedOcr(req.file.buffer, req.file.originalname, pdfPageCount);
-          aiExtractedContent = true;
-        } catch (aiErr: any) {
-          console.warn("Verified PDF OCR failed:", aiErr);
-          return res.status(422).json({
-            code: 'PDF_TEXT_EXTRACTION_FAILED',
-            error: aiErr?.message || 'تعذر استخراج نص عربي موثوق من ملف PDF. جرّب نسخة قابلة للبحث أو قسّم الملف إلى أجزاء أصغر.',
-          });
-        }
-      }
-      
-      // Safety net to strip null bytes and other invalid characters for Postgres 'text' column
-      if (content) {
-        content = content.replace(/\u0000/g, '');
-        if (aiExtractedContent) {
-          content = `[تنبيه: نص مستخرج آلياً من المستند ويحتاج مطابقة بشرية مع الأصل قبل الاستناد النظامي]\n\n${content}`;
-        }
-      }
-
-      // P0-3 FIX: reject non-PDF documents whose extracted text failed quality
-      // validation. We cannot OCR non-PDF files, so the only safe action is to
-      // refuse ingestion and ask the user to re-upload a clean copy.
-      if (!isPdf && localQuality && !localQuality.usable) {
-        console.warn('Unsafe non-PDF text detected; rejecting upload:', {
-          fileName: req.file.originalname,
-          reason: localQuality.reason,
-          metrics: localQuality.metrics,
-        });
-        return res.status(422).json({
-          code: 'DOCUMENT_TEXT_QUALITY_FAILED',
-          error: 'النص المستخرج غير صالح للفهرسة (قد يكون مشوّهاً أو بترميز غير UTF-8). جرّب رفع نسخة نظيفة بصيغة UTF-8.',
-          details: { reason: localQuality.reason },
-        });
-      }
-
-      if (!content || !content.trim()) {
-        return res.status(422).json({
-          code: 'DOCUMENT_TEXT_EXTRACTION_FAILED',
-          error: 'تعذر استخراج نص قابل للفهرسة من المستند. جرّب نسخة قابلة للبحث أو ارفع الملف بصيغة DOCX أو TXT.',
-        });
-      }
-
-      const { db } = await import('./src/db/index.ts');
-      const { knowledge, knowledgeFiles } = await import('./src/db/schema.ts');
       const sha256 = createHash('sha256').update(req.file.buffer).digest('hex');
-      let insertedDoc: any = null;
-      await db.transaction(async (tx: any) => {
-        const rows = await tx.insert(knowledge).values({
-          orgId: org.id,
-          title: req.file.originalname,
-          content,
-        }).returning();
-        insertedDoc = rows[0];
-        if (!insertedDoc?.id) throw new Error('KNOWLEDGE_INSERT_RETURNED_EMPTY');
-        await tx.insert(knowledgeFiles).values({
-          knowledgeId: insertedDoc.id,
-          fileName: req.file.originalname,
-          mimeType: mimeType || 'application/octet-stream',
-          fileSize: req.file.buffer.length,
-          sha256,
-          data: req.file.buffer,
-        });
+      const result = await runKnowledgeIngestion({
+        buffer: req.file.buffer,
+        fileName: originalName,
+        mimeType,
+      }, {
+        ocrPdf: extractPdfWithVerifiedOcr,
+        onStage: (stage) => {
+          const [event, stageName] = mapKnowledgeStage(stage);
+          logKnowledge?.(event, stageName);
+        },
+        persist: async (prepared) => {
+          const { db } = await import('./src/db/index.ts');
+          const { knowledge, knowledgeFiles } = await import('./src/db/schema.ts');
+          let insertedDoc: any = null;
+          await db.transaction(async (tx: any) => {
+            const rows = await tx.insert(knowledge).values({
+              orgId: org.id,
+              title: originalName,
+              content: prepared.content,
+            }).returning();
+            insertedDoc = rows[0];
+            if (!insertedDoc?.id) throw new Error('KNOWLEDGE_INSERT_RETURNED_EMPTY');
+            await tx.insert(knowledgeFiles).values({
+              knowledgeId: insertedDoc.id,
+              fileName: originalName,
+              mimeType: mimeType || 'application/octet-stream',
+              fileSize: req.file.buffer.length,
+              sha256,
+              data: req.file.buffer,
+            });
+          });
+          ragEngine.invalidateOrganization(org.id);
+          return insertedDoc;
+        },
       });
 
-      ragEngine.invalidateOrganization(org.id);
+      logKnowledge('KnowledgeUpload:SUCCESS', 'complete');
 
       res.json({
-        ...insertedDoc,
-        fileName: req.file.originalname,
+        ...result.persisted,
+        fileName: originalName,
         mimeType: mimeType || 'application/octet-stream',
         fileSize: req.file.buffer.length,
         sha256,
         hasOriginalFile: true,
-        extractionMethod: aiExtractedContent ? 'VERIFIED_OCR' : 'NATIVE_TEXT',
+        extractionMethod: result.prepared.extractionMethod,
       });
-    } catch (e) {
-      console.error("Upload error:", e);
-      res.status(500).json({ error: 'Failed to upload knowledge' });
+    } catch (e: any) {
+      if (e instanceof KnowledgeDocumentError) {
+        logKnowledge?.('KnowledgeUpload:ERROR', 'extract_or_normalize', e.code);
+        console.error('[KnowledgeUpload:DIAGNOSTIC]', {
+          code: e.code,
+          internalError: e.cause instanceof Error ? e.cause.message : undefined,
+        });
+        return res.status(e.status).json({ code: e.code, error: e.userMessage });
+      }
+      const code = getKnowledgePersistenceErrorCode(e);
+      logKnowledge?.('KnowledgeUpload:ERROR', 'persist_and_publish_to_rag', code);
+      console.error('[KnowledgeUpload:DIAGNOSTIC]', {
+        code,
+        postgresCode: e?.code || e?.cause?.code,
+        internalError: e?.message || String(e),
+      });
+      const userMessage = code === 'KNOWLEDGE_SCHEMA_OUTDATED'
+        ? 'قاعدة البيانات لم تُحدّث بعد لدعم حفظ الملفات الأصلية. نفّذ ترحيلات قاعدة البيانات ثم أعد المحاولة.'
+        : code === 'DATABASE_UNAVAILABLE'
+          ? 'قاعدة البيانات غير متاحة حاليًا. لم يتم حفظ سجل ناقص.'
+          : 'تعذر حفظ المستند في قاعدة المعرفة. لم يتم تسجيل ملف ناقص.';
+      return res.status(code === 'KNOWLEDGE_SCHEMA_OUTDATED' ? 503 : 500).json({ code, error: userMessage });
     }
   });
 
@@ -3333,33 +3379,24 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
       // Replace content via new file upload
       if (req.file) {
         const originalName = normalizeUploadedFileName(req.file.originalname, req.body?.originalName);
-        const lower = originalName.toLowerCase();
-        const supported = isSupportedKnowledgeFile(lower);
+        const supported = isSupportedKnowledgeFile(originalName);
         if (!supported) {
           return res.status(415).json({ error: 'Unsupported file type. Use PDF, DOCX, XLSX, CSV, TXT, MD, or JSON.' });
         }
-        let extracted = '';
         try {
-          const native = await extractNativeDocumentText(req.file.buffer, lower, req.file.mimetype);
-          extracted = native.text;
-          const initialQuality = assessDocumentTextQuality(extracted);
-          if (native.isPdf && !initialQuality.usable) {
-            extracted = await extractPdfWithVerifiedOcr(req.file.buffer, originalName, native.pageCount);
-          }
-        } catch (parseErr) {
+          const prepared = await prepareKnowledgeDocument({
+            buffer: req.file.buffer,
+            fileName: originalName,
+            mimeType: req.file.mimetype,
+          }, { ocrPdf: extractPdfWithVerifiedOcr });
+          updates.content = prepared.content;
+        } catch (parseErr: any) {
           console.error('Replace-file parse error:', parseErr);
+          if (parseErr instanceof KnowledgeDocumentError) {
+            return res.status(parseErr.status).json({ code: parseErr.code, error: parseErr.userMessage });
+          }
           return res.status(422).json({ code: 'DOCUMENT_TEXT_EXTRACTION_FAILED', error: 'تعذر استخراج النص من الملف الجديد.' });
         }
-        extracted = (extracted || '').replace(/\u0000/g, '');
-        const q = assessDocumentTextQuality(extracted);
-        if (!q.usable) {
-          return res.status(422).json({
-            code: 'DOCUMENT_TEXT_QUALITY_FAILED',
-            error: 'النص المستخرج غير صالح للفهرسة.',
-            details: { reason: q.reason },
-          });
-        }
-        updates.content = extracted;
         if (!(typeof newTitle === 'string' && newTitle.trim())) updates.title = originalName;
         auditParts.push('content=replaced');
       }
