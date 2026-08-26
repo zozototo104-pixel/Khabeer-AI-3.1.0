@@ -1,76 +1,113 @@
-export const SUPPORTED_KNOWLEDGE_EXTENSIONS = ['.pdf', '.docx', '.xlsx', '.csv', '.txt', '.md', '.json'] as const;
+import { assessDocumentTextQuality } from './DocumentTextQuality.ts';
+import {
+  extractNativeDocumentText,
+  KnowledgeDocumentError,
+  normalizeExtractedDocumentText,
+  type KnowledgeFormat,
+} from './DocumentIngestionService.ts';
 
-export function isSupportedKnowledgeFile(fileName: string): boolean {
-  const lower = String(fileName || '').toLowerCase();
-  return SUPPORTED_KNOWLEDGE_EXTENSIONS.some((extension) => lower.endsWith(extension));
+export interface KnowledgeUploadSource {
+  buffer: Buffer;
+  fileName: string;
+  mimeType: string;
 }
 
-export interface NativeDocumentExtraction {
-  text: string;
+export interface PreparedKnowledgeDocument {
+  content: string;
   pageCount: number;
   isPdf: boolean;
+  format: KnowledgeFormat;
+  extractionMethod: 'VERIFIED_OCR' | 'NATIVE_TEXT';
 }
 
-/**
- * Extract searchable text without changing or truncating the source bytes.
- * The original buffer is persisted separately by the route.
- */
-export async function extractNativeDocumentText(
-  buffer: Buffer,
-  fileName: string,
-  mimeType = '',
-): Promise<NativeDocumentExtraction> {
-  const lower = String(fileName || '').toLowerCase();
-  const isPdf = lower.endsWith('.pdf') || mimeType === 'application/pdf';
+export type KnowledgeStage =
+  | 'extract_start'
+  | 'extract_done'
+  | 'normalize_done'
+  | 'index_start'
+  | 'index_done';
 
-  if (lower.endsWith('.docx')) {
-    const mammoth = (await import('mammoth')).default;
-    const result = await mammoth.extractRawText({ buffer });
-    return { text: result.value || '', pageCount: 0, isPdf: false };
-  }
+export interface KnowledgeIngestionDependencies<T> {
+  ocrPdf?: (buffer: Buffer, fileName: string, pageCount: number) => Promise<string>;
+  persist: (document: PreparedKnowledgeDocument) => Promise<T>;
+  onStage?: (stage: KnowledgeStage) => void;
+}
 
-  if (lower.endsWith('.csv')) {
-    return { text: buffer.toString('utf8').slice(0, 5_000_000), pageCount: 0, isPdf: false };
-  }
+export async function prepareKnowledgeDocument(
+  source: KnowledgeUploadSource,
+  options: Pick<KnowledgeIngestionDependencies<unknown>, 'ocrPdf' | 'onStage'> = {},
+): Promise<PreparedKnowledgeDocument> {
+  options.onStage?.('extract_start');
+  const native = await extractNativeDocumentText(source.buffer, source.fileName, source.mimeType);
 
-  if (lower.endsWith('.xlsx')) {
-    const excelJsModule: any = await import('exceljs');
-    const ExcelJS = excelJsModule.default || excelJsModule;
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(buffer);
-    const sections: string[] = [];
-    workbook.eachSheet((worksheet: any) => {
-      const rows: string[] = [];
-      worksheet.eachRow((row: any) => {
-        const values: string[] = [];
-        for (let column = 1; column <= row.cellCount; column++) {
-          values.push(String(row.getCell(column).text || '').replace(/[\r\n]+/g, ' ').trim());
-        }
-        rows.push(values.join(','));
-      });
-      sections.push(`=== جدول: ${worksheet.name} ===\n${rows.join('\n')}`);
-    });
-    return { text: sections.join('\n\n').slice(0, 5_000_000), pageCount: 0, isPdf: false };
-  }
+  let content = normalizeExtractedDocumentText(native.text);
+  let extractionMethod: PreparedKnowledgeDocument['extractionMethod'] = 'NATIVE_TEXT';
+  let quality = assessDocumentTextQuality(content);
 
-  if (lower.endsWith('.txt') || lower.endsWith('.md') || lower.endsWith('.json')) {
-    return { text: buffer.toString('utf8'), pageCount: 0, isPdf: false };
-  }
-
-  if (isPdf) {
-    const { PDFParse } = await import('pdf-parse');
-    const parser = new PDFParse({ data: buffer });
+  if (native.isPdf && !quality.usable) {
+    if (!options.ocrPdf) {
+      throw new KnowledgeDocumentError(
+        'PDF_TEXT_EXTRACTION_FAILED',
+        'تعذر استخراج نص موثوق من ملف PDF، ولا تتوفر معالجة OCR لهذا الطلب.',
+        422,
+      );
+    }
     try {
-      const result = await parser.getText();
-      return {
-        text: result.text || '',
-        pageCount: Number(result.total || result.pages?.length || 0),
-        isPdf: true,
-      };
-    } finally {
-      await parser.destroy().catch(() => undefined);
+      const ocrText = await options.ocrPdf(source.buffer, source.fileName, native.pageCount);
+      content = normalizeExtractedDocumentText(ocrText);
+      quality = assessDocumentTextQuality(content);
+      extractionMethod = 'VERIFIED_OCR';
+    } catch (error) {
+      if (error instanceof KnowledgeDocumentError) throw error;
+      throw new KnowledgeDocumentError(
+        'PDF_TEXT_EXTRACTION_FAILED',
+        'تعذر استخراج نص عربي موثوق من ملف PDF. جرّب نسخة قابلة للبحث أو قسّم الملف إلى أجزاء أصغر.',
+        422,
+        error,
+      );
     }
   }
 
-  throw new Error('UNSUPPORTED_KNOWLEDGE_FILE');
+  if (!content || quality.reason === 'text_too_short_or_empty') {
+    throw new KnowledgeDocumentError(
+      'DOCUMENT_TEXT_EXTRACTION_EMPTY',
+      'تعذر استخراج نص قابل للفهرسة من المستند. تأكد أن الملف يحتوي نصًا فعليًا وليس صفحات أو خلايا فارغة.',
+      422,
+    );
+  }
+
+  if (!quality.usable) {
+    throw new KnowledgeDocumentError(
+      'DOCUMENT_TEXT_QUALITY_FAILED',
+      'النص المستخرج يحتوي ترميزًا أو محارف غير صالحة للفهرسة. أعد تصدير نسخة سليمة من الملف.',
+      422,
+    );
+  }
+
+  if (extractionMethod === 'VERIFIED_OCR') {
+    content = `[تنبيه: نص مستخرج آلياً من المستند ويحتاج مطابقة بشرية مع الأصل قبل الاستناد النظامي]\n\n${content}`;
+  }
+
+  options.onStage?.('extract_done');
+  options.onStage?.('normalize_done');
+
+  return {
+    content,
+    pageCount: native.pageCount,
+    isPdf: native.isPdf,
+    format: native.format,
+    extractionMethod,
+  };
+}
+
+/** Extraction and validation must finish before the persistence callback runs. */
+export async function runKnowledgeIngestion<T>(
+  source: KnowledgeUploadSource,
+  dependencies: KnowledgeIngestionDependencies<T>,
+): Promise<{ prepared: PreparedKnowledgeDocument; persisted: T }> {
+  const prepared = await prepareKnowledgeDocument(source, dependencies);
+  dependencies.onStage?.('index_start');
+  const persisted = await dependencies.persist(prepared);
+  dependencies.onStage?.('index_done');
+  return { prepared, persisted };
 }
