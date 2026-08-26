@@ -118,28 +118,74 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
 
       const formData = new FormData();
       // Pass original file directly to FormData (fixes Safari regex/pattern constructor bug)
-      formData.append('file', file);
       formData.append('originalName', encodeURIComponent(file.name));
       if (selectedOrgId) formData.append('orgId', selectedOrgId);
+      // Keep metadata before the binary part so multer can report the filename
+      // even when the file itself is rejected by the size/count limits.
+      formData.append('file', file);
 
       setUploadProgress(0);
       const data = await new Promise<any>((resolve, reject) => {
         const request = new XMLHttpRequest();
+        let uploadInactivityTimer: number | null = null;
+        let processingTimer: number | null = null;
+        let clientTimeoutMessage = '';
+        const clearTimers = () => {
+          if (uploadInactivityTimer !== null) window.clearTimeout(uploadInactivityTimer);
+          if (processingTimer !== null) window.clearTimeout(processingTimer);
+          uploadInactivityTimer = null;
+          processingTimer = null;
+        };
+        const abortForTimeout = (message: string) => {
+          clientTimeoutMessage = message;
+          request.abort();
+        };
+        const armUploadInactivityTimer = () => {
+          if (uploadInactivityTimer !== null) window.clearTimeout(uploadInactivityTimer);
+          uploadInactivityTimer = window.setTimeout(() => {
+            abortForTimeout('توقف إرسال الملف لمدة 3 دقائق. افحص الاتصال ثم أعد المحاولة؛ لم يتم تسجيل رفع ناقص.');
+          }, 180_000);
+        };
         request.open('POST', `/api/knowledge?orgId=${encodeURIComponent(selectedOrgId)}`);
         request.setRequestHeader('Authorization', `Bearer ${activeToken}`);
-        request.timeout = 240_000;
+        // Do not let slow upload time consume the server-processing allowance.
+        // The two phase-specific watchdogs distinguish network stalls from PDF OCR.
+        request.timeout = 0;
+        armUploadInactivityTimer();
         request.upload.onprogress = (event) => {
-          if (event.lengthComputable) setUploadProgress(Math.min(100, Math.round((event.loaded / event.total) * 100)));
+          armUploadInactivityTimer();
+          if (event.lengthComputable) setUploadProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+        };
+        request.upload.onload = () => {
+          if (uploadInactivityTimer !== null) window.clearTimeout(uploadInactivityTimer);
+          uploadInactivityTimer = null;
+          setUploadProgress(99);
+          const isPdf = file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf';
+          processingTimer = window.setTimeout(() => {
+            abortForTimeout(isPdf
+              ? 'اكتمل إرسال PDF لكن الخادم لم يُنهِ الاستخراج خلال 15 دقيقة. راجع سجل KnowledgeUpload لمعرفة المرحلة المتوقفة.'
+              : 'اكتمل إرسال الملف لكن الخادم لم يُنهِ الاستخراج والحفظ خلال 4 دقائق. راجع سجل KnowledgeUpload لمعرفة المرحلة المتوقفة.');
+          }, isPdf ? 900_000 : 240_000);
         };
         request.onload = () => {
+          clearTimers();
           let body: any = {};
           try { body = JSON.parse(request.responseText || '{}'); } catch {}
           if (request.status >= 200 && request.status < 300) resolve(body);
-          else reject(new Error(body.error || `فشل رفع المستند (HTTP ${request.status})`));
+          else reject(new Error(body.error || `${body.code ? `[${body.code}] ` : ''}فشل رفع المستند (HTTP ${request.status})`));
         };
-        request.onerror = () => reject(new Error('انقطع الاتصال أثناء رفع الملف. لم يتم تسجيل رفع ناقص.'));
-        request.ontimeout = () => reject(new Error('انتهت مهلة الرفع والمعالجة بعد 4 دقائق. جرّب ملفاً أصغر أو اتصالاً أكثر استقراراً.'));
-        request.onabort = () => reject(new Error('تم إلغاء رفع الملف.'));
+        request.onerror = () => {
+          clearTimers();
+          reject(new Error('انقطع الاتصال أثناء إرسال الملف أو انتظار استجابة الخادم. لم يتم تسجيل رفع ناقص.'));
+        };
+        request.ontimeout = () => {
+          clearTimers();
+          reject(new Error('انتهت مهلة اتصال المتصفح بالخادم.'));
+        };
+        request.onabort = () => {
+          clearTimers();
+          reject(new Error(clientTimeoutMessage || 'تم إلغاء رفع الملف.'));
+        };
         request.send(formData);
       });
       if (data && data.id) {
