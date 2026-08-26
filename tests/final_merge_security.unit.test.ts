@@ -5,6 +5,7 @@ import { readFileSync, existsSync } from 'node:fs';
 const server = readFileSync(new URL('../server.ts', import.meta.url), 'utf8');
 const auth = readFileSync(new URL('../src/middleware/auth.ts', import.meta.url), 'utf8');
 const schema = readFileSync(new URL('../src/db/schema.ts', import.meta.url), 'utf8');
+const knowledgePipeline = readFileSync(new URL('../server/services/knowledge/KnowledgeIngestionPipeline.ts', import.meta.url), 'utf8');
 
  test('direct auth and legacy websocket auth are explicitly gated', () => {
   assert.match(server, /ALLOW_DEV_DIRECT_AUTH\s*!==\s*'true'/);
@@ -31,7 +32,7 @@ test('knowledge ingestion keeps selected organization scope and JSON/quality pro
   assert.match(server, /resolveOwnedOrganization\(req\.user\.uid, req\.body\.orgId\)/);
   assert.match(server, /resolveOwnedOrganization\(req\.user\.uid, requestedOrgId\)/);
   assert.match(server, /'\.json'/);
-  assert.match(server, /DOCUMENT_TEXT_QUALITY_FAILED/);
+  assert.match(knowledgePipeline, /DOCUMENT_TEXT_QUALITY_FAILED/);
   assert.match(server, /FILE_TOO_LARGE/);
 });
 
