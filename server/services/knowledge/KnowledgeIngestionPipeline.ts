@@ -14,7 +14,7 @@ export interface KnowledgeUploadSource {
 
 export interface PreparedKnowledgeDocument {
   content: string;
-
+  pageCount: number;
   isPdf: boolean;
   format: KnowledgeFormat;
   extractionMethod: 'VERIFIED_OCR' | 'NATIVE_TEXT';
