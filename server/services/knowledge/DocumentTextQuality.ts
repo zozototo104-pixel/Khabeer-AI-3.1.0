@@ -1,113 +1,138 @@
-import { assessDocumentTextQuality } from './DocumentTextQuality.ts';
-import {
-  extractNativeDocumentText,
-  KnowledgeDocumentError,
-  normalizeExtractedDocumentText,
-  type KnowledgeFormat,
-} from './DocumentIngestionService.ts';
-
-export interface KnowledgeUploadSource {
-  buffer: Buffer;
-  fileName: string;
-  mimeType: string;
+export interface DocumentTextQualityMetrics {
+  length: number;
+  visibleCharacters: number;
+  letters: number;
+  arabicCharacters: number;
+  latinCharacters: number;
+  digits: number;
+  replacementCharacters: number;
+  controlCharacters: number;
+  privateUseCharacters: number;
+  mojibakeMarkers: number;
+  scriptTransitions: number;
+  suspiciousSymbols: number;
 }
 
-export interface PreparedKnowledgeDocument {
-  content: string;
-  pageCount: number;
-  isPdf: boolean;
-  format: KnowledgeFormat;
-  extractionMethod: 'VERIFIED_OCR' | 'NATIVE_TEXT';
+export interface DocumentTextQualityAssessment {
+  usable: boolean;
+  reason: string;
+  metrics: DocumentTextQualityMetrics;
 }
 
-export type KnowledgeStage =
-  | 'extract_start'
-  | 'extract_done'
-  | 'normalize_done'
-  | 'index_start'
-  | 'index_done';
+const ARABIC_RE = /[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]/g;
+const LATIN_RE = /[A-Za-z]/g;
+const DIGIT_RE = /[0-9\u0660-\u0669\u06f0-\u06f9]/g;
+const REPLACEMENT_RE = /\uFFFD/g;
+const CONTROL_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
+const PRIVATE_USE_RE = /[\uE000-\uF8FF]/g;
+const MOJIBAKE_RE = /(?:Ã.|Â.|Ø.|Ù.|â€|â€™|â€œ|â€\u009d|ï¿½|�)/g;
+const SCRIPT_TRANSITION_RE = /(?:[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff][A-Za-z]|[A-Za-z][\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff])/g;
 
-export interface KnowledgeIngestionDependencies<T> {
-  ocrPdf?: (buffer: Buffer, fileName: string, pageCount: number) => Promise<string>;
-  persist: (document: PreparedKnowledgeDocument) => Promise<T>;
-  onStage?: (stage: KnowledgeStage) => void;
+// Characters commonly expected in Arabic/English business documents.
+// Anything outside this set is not automatically wrong, but a high ratio is
+// a strong signal that a PDF font map decoded glyph IDs instead of real text.
+const ALLOWED_VISIBLE_RE = /[\p{L}\p{N}\p{M}\p{P}\p{S}\s]/u;
+
+function count(text: string, expression: RegExp): number {
+  return (text.match(expression) || []).length;
 }
 
-export async function prepareKnowledgeDocument(
-  source: KnowledgeUploadSource,
-  options: Pick<KnowledgeIngestionDependencies<unknown>, 'ocrPdf' | 'onStage'> = {},
-): Promise<PreparedKnowledgeDocument> {
-  options.onStage?.('extract_start');
-  const native = await extractNativeDocumentText(source.buffer, source.fileName, source.mimeType);
+export function assessDocumentTextQuality(input: unknown): DocumentTextQualityAssessment {
+  const text = typeof input === 'string' ? input : String(input ?? '');
+  const trimmed = text.trim();
+  const visibleCharacters = count(trimmed, /\S/g);
+  const arabicCharacters = count(text, ARABIC_RE);
+  const latinCharacters = count(text, LATIN_RE);
+  const digits = count(text, DIGIT_RE);
+  const replacementCharacters = count(text, REPLACEMENT_RE);
+  const controlCharacters = count(text, CONTROL_RE);
+  const privateUseCharacters = count(text, PRIVATE_USE_RE);
+  const mojibakeMarkers = count(text, MOJIBAKE_RE);
+  const scriptTransitions = count(text, SCRIPT_TRANSITION_RE);
+  const letters = arabicCharacters + latinCharacters;
 
-  let content = normalizeExtractedDocumentText(native.text);
-  let extractionMethod: PreparedKnowledgeDocument['extractionMethod'] = 'NATIVE_TEXT';
-  let quality = assessDocumentTextQuality(content);
-
-  if (native.isPdf && !quality.usable) {
-    if (!options.ocrPdf) {
-      throw new KnowledgeDocumentError(
-        'PDF_TEXT_EXTRACTION_FAILED',
-        'تعذر استخراج نص موثوق من ملف PDF، ولا تتوفر معالجة OCR لهذا الطلب.',
-        422,
-      );
-    }
-    try {
-      const ocrText = await options.ocrPdf(source.buffer, source.fileName, native.pageCount);
-      content = normalizeExtractedDocumentText(ocrText);
-      quality = assessDocumentTextQuality(content);
-      extractionMethod = 'VERIFIED_OCR';
-    } catch (error) {
-      if (error instanceof KnowledgeDocumentError) throw error;
-      throw new KnowledgeDocumentError(
-        'PDF_TEXT_EXTRACTION_FAILED',
-        'تعذر استخراج نص عربي موثوق من ملف PDF. جرّب نسخة قابلة للبحث أو قسّم الملف إلى أجزاء أصغر.',
-        422,
-        error,
-      );
-    }
+  let suspiciousSymbols = 0;
+  for (const char of text) {
+    if (!char.trim()) continue;
+    if (!ALLOWED_VISIBLE_RE.test(char)) suspiciousSymbols++;
   }
 
-  if (!content || quality.reason === 'text_too_short_or_empty') {
-    throw new KnowledgeDocumentError(
-      'DOCUMENT_TEXT_EXTRACTION_EMPTY',
-      'تعذر استخراج نص قابل للفهرسة من المستند. تأكد أن الملف يحتوي نصًا فعليًا وليس صفحات أو خلايا فارغة.',
-      422,
-    );
-  }
-
-  if (!quality.usable) {
-    throw new KnowledgeDocumentError(
-      'DOCUMENT_TEXT_QUALITY_FAILED',
-      'النص المستخرج يحتوي ترميزًا أو محارف غير صالحة للفهرسة. أعد تصدير نسخة سليمة من الملف.',
-      422,
-    );
-  }
-
-  if (extractionMethod === 'VERIFIED_OCR') {
-    content = `[تنبيه: نص مستخرج آلياً من المستند ويحتاج مطابقة بشرية مع الأصل قبل الاستناد النظامي]\n\n${content}`;
-  }
-
-  options.onStage?.('extract_done');
-  options.onStage?.('normalize_done');
-
-  return {
-    content,
-    pageCount: native.pageCount,
-    isPdf: native.isPdf,
-    format: native.format,
-    extractionMethod,
+  const metrics: DocumentTextQualityMetrics = {
+    length: text.length,
+    visibleCharacters,
+    letters,
+    arabicCharacters,
+    latinCharacters,
+    digits,
+    replacementCharacters,
+    controlCharacters,
+    privateUseCharacters,
+    mojibakeMarkers,
+    scriptTransitions,
+    suspiciousSymbols,
   };
+
+  if (visibleCharacters < 8) {
+    return { usable: false, reason: 'text_too_short_or_empty', metrics };
+  }
+
+  const visibleBase = Math.max(1, visibleCharacters);
+  if (replacementCharacters >= 2 && replacementCharacters / visibleBase >= 0.001) {
+    return { usable: false, reason: 'unicode_replacement_characters', metrics };
+  }
+  if (controlCharacters >= 2 && controlCharacters / Math.max(1, text.length) >= 0.001) {
+    return { usable: false, reason: 'excessive_control_characters', metrics };
+  }
+  if (privateUseCharacters >= 2) {
+    return { usable: false, reason: 'private_use_glyphs', metrics };
+  }
+  if (mojibakeMarkers >= 2) {
+    return { usable: false, reason: 'suspected_mojibake', metrics };
+  }
+
+  // Broken Arabic PDF ToUnicode maps frequently produce text that alternates
+  // between Arabic glyphs and stray Latin letters with no word boundary.
+  // Normal bilingual documents almost always separate the two scripts with
+  // whitespace or punctuation, so repeated direct transitions are suspicious.
+  if (arabicCharacters >= 20 && scriptTransitions >= 4) {
+    return { usable: false, reason: 'broken_arabic_font_mapping', metrics };
+  }
+
+  const latinShare = letters > 0 ? latinCharacters / letters : 0;
+  if (
+    arabicCharacters >= 40 &&
+    latinCharacters >= 12 &&
+    latinShare >= 0.12 &&
+    latinShare <= 0.75 &&
+    scriptTransitions >= 2
+  ) {
+    return { usable: false, reason: 'implausible_mixed_script_text', metrics };
+  }
+
+  if (suspiciousSymbols >= 8 && suspiciousSymbols / visibleBase >= 0.03) {
+    return { usable: false, reason: 'excessive_unmapped_symbols', metrics };
+  }
+
+  return { usable: true, reason: 'ok', metrics };
 }
 
-/** Extraction and validation must finish before the persistence callback runs. */
-export async function runKnowledgeIngestion<T>(
-  source: KnowledgeUploadSource,
-  dependencies: KnowledgeIngestionDependencies<T>,
-): Promise<{ prepared: PreparedKnowledgeDocument; persisted: T }> {
-  const prepared = await prepareKnowledgeDocument(source, dependencies);
-  dependencies.onStage?.('index_start');
-  const persisted = await dependencies.persist(prepared);
-  dependencies.onStage?.('index_done');
-  return { prepared, persisted };
+export interface PdfPageRange {
+  start: number;
+  end: number;
+}
+
+export function buildPdfPageRanges(totalPages: number, pagesPerRange = 20): PdfPageRange[] {
+  const total = Math.floor(Number(totalPages));
+  const chunk = Math.floor(Number(pagesPerRange));
+
+  if (!Number.isFinite(total) || total <= 0) return [];
+  if (!Number.isFinite(chunk) || chunk <= 0) {
+    throw new RangeError('pagesPerRange must be a positive integer');
+  }
+
+  const ranges: PdfPageRange[] = [];
+  for (let start = 1; start <= total; start += chunk) {
+    ranges.push({ start, end: Math.min(total, start + chunk - 1) });
+  }
+  return ranges;
 }
