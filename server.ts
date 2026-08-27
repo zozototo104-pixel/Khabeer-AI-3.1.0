@@ -347,9 +347,25 @@ async function extractPdfWithVerifiedOcr(
     const processPage = async (index: number) => {
       assertOcrBudget();
       const pageNumber = index + 1;
-      const imageName = files[index];
-      const imagePath = imageName ? path.join(tempDir, imageName) : '';
+      const pageOutputPrefix = path.join(tempDir, `ocr-${pageNumber}`);
+      let imagePath = '';
       let extracted = '';
+
+      try {
+        assertOcrBudget();
+        await runOcrProcess(
+          'pdftoppm',
+          ['-f', String(pageNumber), '-singlefile', '-r', '170', '-png', pdfPath, pageOutputPrefix],
+          Math.max(5_000, Math.min(30_000, remainingOcrBudgetMs())),
+        );
+        imagePath = `${pageOutputPrefix}.png`;
+      } catch (error) {
+        console.warn('PDF page rasterization failed', {
+          fileName,
+          pageNumber,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
 
       if (imagePath) {
         try {
