@@ -296,10 +296,22 @@ async function extractPdfWithVerifiedOcr(
           .normalize('NFKC')
           .replace(/[\u202A-\u202E\u2066-\u2069]/g, '')
           .trim();
-        if (isUsefulOcrPage(normalized)) {
+        // A PDF can contain plenty of Unicode Arabic characters while its
+        // ToUnicode/font map has actually emitted isolated visual glyphs
+        // (for example: "ق ا و م ة" instead of real words). The lightweight
+        // OCR predicate only measures character presence, so use the full
+        // Arabic quality gate per page before trusting native PDF text.
+        const directQuality = assessDocumentTextQuality(normalized, { pageCount: 1 });
+        if (isUsefulOcrPage(normalized) && directQuality.usable) {
           usablePages += 1;
           pageTexts[index] = `[[الصفحة ${index + 1}]]\n${normalized}`;
         } else {
+          console.log('PDF native page rejected by quality gate; forcing OCR', {
+            fileName,
+            pageNumber: index + 1,
+            reason: directQuality.reason,
+            reasons: directQuality.reasons,
+          });
           pagesNeedingOcr.push(index);
         }
       }
