@@ -158,6 +158,8 @@ export function assessDocumentTextQuality(
     scriptTransitions,
     suspiciousSymbols,
     arabicCharacterRatio,
+    arabicPresentationFormCharacters,
+    arabicPresentationFormRatio,
     whitespaceCharacters,
     whitespaceRatio,
     arabicWordRuns,
