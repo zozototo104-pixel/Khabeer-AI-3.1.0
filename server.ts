@@ -275,11 +275,12 @@ async function extractPdfWithVerifiedOcr(
       throw new Error(`يتجاوز المستند الحد الآمن للمعالجة (${maximumPages} صفحة). يرجى تقسيمه إلى أجزاء أصغر ثم رفعها بالتتابع.`);
     }
 
+    assertOcrBudget();
     const pagePrefix = path.join(tempDir, 'page');
     await runOcrProcess(
       'pdftoppm',
       ['-f', '1', '-l', String(pageCount), '-r', '170', '-png', pdfPath, pagePrefix],
-      Math.max(180_000, pageCount * 8_000),
+      Math.max(10_000, Math.min(Math.max(180_000, pageCount * 8_000), remainingOcrBudgetMs())),
     );
 
     const files = (await fs.readdir(tempDir))
