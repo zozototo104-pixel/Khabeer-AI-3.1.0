@@ -317,7 +317,7 @@ export class SpeakerRecognitionService {
     };
   }
 
-  public async getEmbedding(pcmData: Float32Array): Promise<number[]> {
+  public async getEmbedding(pcmData: Float32Array, options: { bypassVad?: boolean } = {}): Promise<number[]> {
     const quality = AudioFeatures.checkAudioQuality(pcmData);
     if (!quality.isValid) throw new Error(`LOW_AUDIO_QUALITY:${quality.reason}`);
 
