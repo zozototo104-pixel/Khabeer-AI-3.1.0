@@ -66,7 +66,17 @@ export function validateKnowledgeFileType(buffer: Buffer, fileName: string, mime
   }
 
   const normalizedMime = String(mimeType || '').split(';', 1)[0].trim().toLowerCase();
-  if (!GENERIC_UPLOAD_MIMES.has(normalizedMime) && !MIME_BY_FORMAT[format].has(normalizedMime)) {
+  const zipSignature = hasZipSignature(buffer);
+  // Browsers (notably mobile Safari and document providers) can report an
+  // arbitrary MIME for XLSX. A .xlsx extension plus an OOXML ZIP signature is
+  // stronger evidence than that client-supplied MIME, so let ExcelJS perform
+  // the authoritative workbook parse. Other formats retain strict MIME rules.
+  const trustedXlsxContainer = format === 'xlsx' && zipSignature;
+  if (
+    !trustedXlsxContainer
+    && !GENERIC_UPLOAD_MIMES.has(normalizedMime)
+    && !MIME_BY_FORMAT[format].has(normalizedMime)
+  ) {
     throw new KnowledgeDocumentError(
       'FILE_TYPE_MISMATCH',
       'امتداد الملف لا يطابق نوعه الفعلي. أعد تصدير الملف بصيغته الصحيحة ثم ارفعه مجددًا.',
@@ -77,10 +87,12 @@ export function validateKnowledgeFileType(buffer: Buffer, fileName: string, mime
   if (format === 'pdf' && !buffer.subarray(0, 5).equals(Buffer.from('%PDF-'))) {
     throw new KnowledgeDocumentError('MALFORMED_PDF', 'ملف PDF غير صالح أو غير مكتمل.', 422);
   }
-  if ((format === 'docx' || format === 'xlsx') && !hasZipSignature(buffer)) {
+  if ((format === 'docx' || format === 'xlsx') && !zipSignature) {
     throw new KnowledgeDocumentError(
-      format === 'docx' ? 'MALFORMED_DOCX' : 'MALFORMED_XLSX',
-      format === 'docx' ? 'ملف DOCX غير صالح أو غير مكتمل.' : 'ملف XLSX غير صالح أو غير مكتمل.',
+      format === 'docx' ? 'MALFORMED_DOCX' : 'XLSX_SIGNATURE_MISMATCH',
+      format === 'docx'
+        ? 'ملف DOCX غير صالح أو غير مكتمل.'
+        : 'بنية الملف لا تطابق صيغة XLSX. تأكد من امتداد الملف وأعد تصديره بصيغة Excel XLSX.',
       422,
     );
   }
@@ -145,7 +157,16 @@ export async function extractNativeDocumentText(
       const excelJsModule: any = await import('exceljs');
       const ExcelJS = excelJsModule.default || excelJsModule;
       const workbook = new ExcelJS.Workbook();
-      await workbook.xlsx.load(buffer);
+      try {
+        await workbook.xlsx.load(buffer);
+      } catch (error) {
+        throw new KnowledgeDocumentError(
+          'XLSX_PARSE_FAILED',
+          'تعذر على قارئ Excel فتح ملف XLSX. قد يستخدم الملف ميزة غير مدعومة أو تكون بنيته الداخلية غير قابلة للقراءة. أعد حفظه كملف XLSX جديد ثم حاول مجددًا.',
+          422,
+          error,
+        );
+      }
       const sections: string[] = [];
 
       workbook.eachSheet((worksheet: any) => {
@@ -202,7 +223,9 @@ export async function extractNativeDocumentText(
     const label = format.toUpperCase();
     throw new KnowledgeDocumentError(
       code,
-      `تعذر استخراج النص من ملف ${label}. قد يكون الملف تالفًا أو غير مكتمل.`,
+      format === 'xlsx'
+        ? 'تعذر استخراج النص من ملف XLSX بسبب خطأ في قراءة المصنف.'
+        : `تعذر استخراج النص من ملف ${label}. قد يكون الملف تالفًا أو غير مكتمل.`,
       422,
       error,
     );
