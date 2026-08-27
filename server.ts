@@ -344,9 +344,23 @@ async function extractPdfWithVerifiedOcr(
       }
     };
 
-    const processPage = async (index: number) => {
-      assertOcrBudget();
+    let ocrBudgetExhausted = false;
+
+    const markPageUnavailable = (index: number) => {
       const pageNumber = index + 1;
+      if (!failedPages.includes(pageNumber)) failedPages.push(pageNumber);
+      if (!pageTexts[index]) {
+        pageTexts[index] = `[[الصفحة ${pageNumber}]]\n[لم يتوفر نص موثوق لهذه الصفحة؛ يجب الرجوع إلى الأصل عند الاستناد إليها.]`;
+      }
+    };
+
+    const processPage = async (index: number) => {
+      const pageNumber = index + 1;
+      if (remainingOcrBudgetMs() <= 0) {
+        ocrBudgetExhausted = true;
+        markPageUnavailable(index);
+        return;
+      }
       const pageOutputPrefix = path.join(tempDir, `ocr-${pageNumber}`);
       let imagePath = '';
       let extracted = '';
