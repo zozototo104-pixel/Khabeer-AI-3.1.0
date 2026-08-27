@@ -3361,6 +3361,7 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
         const sourceBuffer = Buffer.from(req.file.buffer);
         const { db } = await import('./src/db/index.ts');
         const { knowledge, knowledgeFiles } = await import('./src/db/schema.ts');
+        const { eq } = await import('drizzle-orm');
         let pendingDoc: any;
         await db.transaction(async (tx: any) => {
           const rows = await tx.insert(knowledge).values({
