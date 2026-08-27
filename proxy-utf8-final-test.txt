@@ -1,0 +1,5 @@
+Khabeer GPT Vercel Proxy UTF-8 Test
+English text is readable.
+العربية تعمل بشكل صحيح
+مرحبا أبو مصعب
+اختبار الكتابة العربية ناجح
