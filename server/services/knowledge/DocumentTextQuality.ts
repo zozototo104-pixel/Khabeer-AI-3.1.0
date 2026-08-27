@@ -111,6 +111,7 @@ export function assessDocumentTextQuality(
   const trimmed = text.trim();
   const visibleCharacters = count(trimmed, /\S/g);
   const arabicCharacters = count(text, ARABIC_RE);
+  const arabicPresentationFormCharacters = count(text, ARABIC_PRESENTATION_FORM_RE);
   const latinCharacters = count(text, LATIN_RE);
   const digits = count(text, DIGIT_RE);
   const replacementCharacters = count(text, REPLACEMENT_RE);
