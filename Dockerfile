@@ -25,8 +25,19 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates libgomp1 poppler-utils tesseract-ocr tesseract-ocr-ara tesseract-ocr-eng \
+  && apt-get install -y --no-install-recommends ca-certificates libgomp1 poppler-utils tesseract-ocr tesseract-ocr-ara tesseract-ocr-eng python3 python3-venv python3-pip \
   && rm -rf /var/lib/apt/lists/*
+
+# Docling provides production-grade PDF layout/reading-order reconstruction.
+# RapidOCR/PP-OCR handles Arabic OCR locally; models are prefetched at image
+# build time so production requests never depend on downloading model files.
+RUN python3 -m venv /opt/docling \
+  && /opt/docling/bin/pip install --no-cache-dir --upgrade pip \
+  && /opt/docling/bin/pip install --no-cache-dir "docling-slim[format-pdf,models-local,feat-ocr-rapidocr,cli]" --extra-index-url https://download.pytorch.org/whl/cpu \
+  && mkdir -p /opt/docling-models \
+  && /opt/docling/bin/docling-tools models download layout tableformer rapidocr --rapidocr-backend-lang onnxruntime:arabic -o /opt/docling-models
+
+ENV DOCLING_ARTIFACTS_PATH=/opt/docling-models
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev \
