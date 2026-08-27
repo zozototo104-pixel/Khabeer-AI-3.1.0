@@ -246,7 +246,15 @@ async function extractPdfWithVerifiedOcr(
   totalPages: number,
 ): Promise<string> {
   const maximumPages = 200;
-  const totalOcrBudgetMs = 6 * 60_000;
+  // OCR now runs in the durable background worker, so a fixed 6-minute wall
+  // clock is too short for large Arabic PDFs and was truncating documents at
+  // roughly page 50. Scale the budget with page count while keeping a hard
+  // upper bound so one pathological document cannot monopolize the worker.
+  const requestedPages = Math.max(1, Math.floor(Number(totalPages || 1)));
+  const totalOcrBudgetMs = Math.min(
+    30 * 60_000,
+    Math.max(6 * 60_000, requestedPages * 15_000),
+  );
   const ocrStartedAt = Date.now();
   const remainingOcrBudgetMs = () => totalOcrBudgetMs - (Date.now() - ocrStartedAt);
   const assertOcrBudget = () => {
