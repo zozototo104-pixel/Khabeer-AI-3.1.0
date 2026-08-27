@@ -1,5 +1,6 @@
 import { SpeakerRegistry } from '../../../src/lib/speaker/SpeakerRegistry.ts';
 import { SpeakerDiarizer } from '../../../src/lib/speaker/SpeakerDiarizer.ts';
+import { selectSpeakerWindows } from '../../../src/lib/speaker/SpeakerWindowing.ts';
 import { SPEAKER_THRESHOLDS } from '../../../src/lib/speaker/types.ts';
 import type {
   SpeakerProfile,
