@@ -46,6 +46,7 @@ function l2Normalize(values) {
 }
 
 let extractor = null;
+let vad = null;
 try {
   const runtimeRequire = createRequire(path.join(workerData.cwd, 'package.json'));
   const sherpa = runtimeRequire('sherpa-onnx-node');
@@ -55,6 +56,20 @@ try {
     debug: workerData.debug,
     provider: workerData.provider,
   });
+  vad = new sherpa.Vad({
+    sileroVad: {
+      model: workerData.vadModelPath,
+      threshold: 0.55,
+      minSpeechDuration: 0.20,
+      minSilenceDuration: 0.20,
+      windowSize: 512,
+      maxSpeechDuration: 12,
+    },
+    sampleRate: 16000,
+    numThreads: 1,
+    debug: false,
+    provider: 'cpu',
+  }, 20);
   const dim = Number(extractor.dim) || 0;
   if (dim !== 512) throw new Error('UNEXPECTED_EMBEDDING_DIM: got ' + dim + ', expected 512');
   parentPort.postMessage({ type: 'ready', dim, version: sherpa.version, onnxruntimeVersion: sherpa.onnxruntimeVersion });
