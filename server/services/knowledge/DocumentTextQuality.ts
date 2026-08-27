@@ -12,6 +12,8 @@ export interface DocumentTextQualityMetrics {
   scriptTransitions: number;
   suspiciousSymbols: number;
   arabicCharacterRatio: number;
+  arabicPresentationFormCharacters: number;
+  arabicPresentationFormRatio: number;
   whitespaceCharacters: number;
   whitespaceRatio: number;
   arabicWordRuns: number;
