@@ -223,7 +223,7 @@ export async function extractNativeDocumentText(
       // reconstructs reading order better. Use it only for clearly Arabic
       // text PDFs; if it is unavailable or produces weak output, keep the
       // existing parser result and let the normal OCR-quality fallback decide.
-      const arabicChars = (pdfParseText.match(/[\u0600-\u06FF]/g) || []).length;
+      const arabicChars = (pdfParseText.match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/g) || []).length;
       const visibleChars = (pdfParseText.match(/[^\s]/g) || []).length;
       const isClearlyArabic = visibleChars >= 40 && arabicChars / visibleChars >= 0.2;
 
