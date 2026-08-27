@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "node scripts/download-speaker-model.mjs && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && esbuild scripts/migrate.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/migrate.cjs && mkdir -p dist/models && cp -n models/*.onnx dist/models/ 2>/dev/null || true",
+    "build": "node scripts/download-speaker-model.mjs && node scripts/download-vad-model.mjs && vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && esbuild scripts/migrate.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/migrate.cjs && mkdir -p dist/models && cp -n models/*.onnx dist/models/ 2>/dev/null || true",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "db:migrate": "tsx scripts/migrate.ts",
