@@ -400,13 +400,13 @@ async function extractPdfWithVerifiedOcr(
     };
 
     const worker = async () => {
-      while (nextPageIndex < pageCount) {
-        const index = nextPageIndex++;
+      while (nextOcrIndex < pagesNeedingOcr.length) {
+        const index = pagesNeedingOcr[nextOcrIndex++];
         await processPage(index);
       }
     };
 
-    await Promise.all(Array.from({ length: Math.min(2, pageCount) }, () => worker()));
+    await Promise.all(Array.from({ length: Math.min(2, pagesNeedingOcr.length) }, () => worker()));
 
     if (usablePages === 0) {
       throw new Error('تعذر استخراج أي صفحة نصية موثوقة من ملف PDF حتى بعد OCR المحلي وقراءة الصور الاحتياطية.');
