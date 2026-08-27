@@ -277,6 +277,61 @@ async function extractPdfWithVerifiedOcr(
 
     assertOcrBudget();
 
+    // Primary engine for difficult PDFs: Docling reconstructs layout, reading
+    // order and tables instead of trusting the PDF's often-broken Arabic glyph
+    // order. RapidOCR/PP-OCR is bundled in the production image. If Docling is
+    // unavailable or its result fails our quality gate, the existing verified
+    // page-by-page pipeline below remains a fail-safe fallback.
+    if (process.env.DOCLING_PDF_ENABLED !== 'false') {
+      const doclingOutput = path.join(tempDir, 'docling-output');
+      try {
+        await fs.mkdir(doclingOutput, { recursive: true });
+        const docling = await runOcrProcess(
+          '/opt/docling/bin/docling',
+          [
+            '--to', 'md',
+            '--output', doclingOutput,
+            '--artifacts-path', process.env.DOCLING_ARTIFACTS_PATH || '/opt/docling-models',
+            '--ocr',
+            '--ocr-engine', 'rapidocr',
+            '--force-ocr',
+            pdfPath,
+          ],
+          Math.max(30_000, Math.min(10 * 60_000, remainingOcrBudgetMs())),
+        );
+        const outputFiles = await fs.readdir(doclingOutput);
+        const markdownFile = outputFiles.find((name) => /\.md$/i.test(name));
+        if (markdownFile) {
+          const doclingText = (await fs.readFile(path.join(doclingOutput, markdownFile), 'utf8'))
+            .normalize('NFKC')
+            .replace(/[\u202A-\u202E\u2066-\u2069]/g, '')
+            .trim();
+          const doclingQuality = assessDocumentTextQuality(doclingText, { pageCount });
+          if (isUsefulOcrPage(doclingText) && doclingQuality.usable) {
+            console.log('PDF extracted by Docling/RapidOCR', {
+              fileName,
+              pageCount,
+              chars: doclingText.length,
+              stderr: String(docling.stderr || '').slice(-300),
+            });
+            return doclingText;
+          }
+          console.warn('Docling output rejected by document quality gate; using verified fallback', {
+            fileName,
+            reason: doclingQuality.reason,
+            reasons: doclingQuality.reasons,
+          });
+        } else {
+          console.warn('Docling produced no Markdown output; using verified fallback', { fileName });
+        }
+      } catch (error) {
+        console.warn('Docling PDF extraction unavailable; using verified fallback', {
+          fileName,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     // First salvage text page-by-page with Poppler. Large PDFs often contain
     // mostly healthy searchable pages and only a few scanned/broken pages.
     const pageTexts = new Array<string>(pageCount);
