@@ -410,14 +410,33 @@ async function extractPdfWithVerifiedOcr(
         }
       }
 
-      if (!isUsefulOcrPage(extracted) && imagePath) {
+      // Tesseract can return a long string that is technically Unicode Arabic
+      // but consists of isolated visual glyphs ("ا ل ...") when the scan/font
+      // is difficult. Character-count checks alone must never accept that as
+      // knowledge-base text. Apply the same full Arabic quality gate used for
+      // native PDF extraction, and escalate the page to vision OCR when needed.
+      let extractedQuality = assessDocumentTextQuality(extracted, { pageCount: 1 });
+      if ((!isUsefulOcrPage(extracted) || !extractedQuality.usable) && imagePath) {
+        console.log('Tesseract page rejected by quality gate; escalating to vision OCR', {
+          fileName,
+          pageNumber,
+          reason: extractedQuality.reason,
+          reasons: extractedQuality.reasons,
+        });
         extracted = await readPageWithGemini(imagePath, pageNumber);
+        extractedQuality = assessDocumentTextQuality(extracted, { pageCount: 1 });
       }
 
-      if (isUsefulOcrPage(extracted)) {
+      if (isUsefulOcrPage(extracted) && extractedQuality.usable) {
         usablePages += 1;
         pageTexts[index] = `[[الصفحة ${pageNumber}]]\n${extracted}`;
       } else {
+        console.warn('All OCR strategies failed page quality gate', {
+          fileName,
+          pageNumber,
+          reason: extractedQuality.reason,
+          reasons: extractedQuality.reasons,
+        });
         failedPages.push(pageNumber);
         pageTexts[index] = `[[الصفحة ${pageNumber}]]\n[لم يتوفر نص موثوق لهذه الصفحة؛ يجب الرجوع إلى الأصل عند الاستناد إليها.]`;
       }
