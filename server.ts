@@ -3297,6 +3297,77 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
       const originalName = req.file.originalname;
       const mimeType = req.file.mimetype;
       const sha256 = createHash('sha256').update(req.file.buffer).digest('hex');
+
+      // Large PDFs must not keep the browser upload request open while OCR runs.
+      // Persist the immutable source first, return 202 immediately, then extract in background.
+      const isPdf = mimeType === 'application/pdf' || /\.pdf$/i.test(originalName);
+      const asyncPdfThreshold = Math.max(256 * 1024, Number(process.env.KNOWLEDGE_ASYNC_PDF_BYTES || 1024 * 1024));
+      if (isPdf && req.file.buffer.length >= asyncPdfThreshold) {
+        const sourceBuffer = Buffer.from(req.file.buffer);
+        const { db } = await import('./src/db/index.ts');
+        const { knowledge, knowledgeFiles } = await import('./src/db/schema.ts');
+        let pendingDoc: any;
+        await db.transaction(async (tx: any) => {
+          const rows = await tx.insert(knowledge).values({
+            orgId: org.id,
+            title: originalName,
+            content: '[[PROCESSING_DOCUMENT]]',
+            processingStatus: 'PENDING',
+            processingError: null,
+            processedPages: 0,
+          }).returning();
+          pendingDoc = rows[0];
+          if (!pendingDoc?.id) throw new Error('KNOWLEDGE_INSERT_RETURNED_EMPTY');
+          await tx.insert(knowledgeFiles).values({
+            knowledgeId: pendingDoc.id,
+            fileName: originalName,
+            mimeType: mimeType || 'application/pdf',
+            fileSize: sourceBuffer.length,
+            sha256,
+            data: sourceBuffer,
+          });
+        });
+
+        res.status(202).json({
+          ...pendingDoc,
+          processingStatus: 'PENDING',
+          fileName: originalName,
+          mimeType: mimeType || 'application/pdf',
+          fileSize: sourceBuffer.length,
+          sha256,
+          hasOriginalFile: true,
+          extractionMethod: 'BACKGROUND_PDF',
+        });
+        logKnowledge('KnowledgeUpload:SUCCESS', 'source_saved_background_processing');
+
+        setImmediate(async () => {
+          try {
+            await db.update(knowledge).set({ processingStatus: 'PROCESSING', processingError: null }).where(eq(knowledge.id, pendingDoc.id));
+            const background = await runKnowledgeIngestion({ buffer: sourceBuffer, fileName: originalName, mimeType }, {
+              ocrPdf: extractPdfWithVerifiedOcr,
+              persist: async (prepared) => {
+                const pageMatches = prepared.content.match(/\[\[(?:الصفحة|PAGE)\s+\d+\]\]/gi);
+                await db.update(knowledge).set({
+                  content: prepared.content,
+                  processingStatus: 'COMPLETE',
+                  processingError: null,
+                  processedPages: pageMatches?.length || 0,
+                  updatedAt: new Date(),
+                }).where(eq(knowledge.id, pendingDoc.id));
+                return pendingDoc;
+              },
+            });
+            if (background?.prepared) ragEngine.invalidateOrganization(org.id);
+            console.log(`[KnowledgeUpload:BACKGROUND_COMPLETE] id=${pendingDoc.id} file=${originalName}`);
+          } catch (error: any) {
+            const message = String(error?.message || error || 'PDF_PROCESSING_FAILED').slice(0, 1000);
+            console.error(`[KnowledgeUpload:BACKGROUND_FAILED] id=${pendingDoc.id}`, error);
+            await db.update(knowledge).set({ processingStatus: 'FAILED', processingError: message, updatedAt: new Date() }).where(eq(knowledge.id, pendingDoc.id)).catch(() => undefined);
+          }
+        });
+        return;
+      }
+
       const result = await runKnowledgeIngestion({
         buffer: req.file.buffer,
         fileName: originalName,
