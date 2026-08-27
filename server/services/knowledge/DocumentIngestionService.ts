@@ -1,3 +1,11 @@
+import { execFile } from 'node:child_process';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+
 export const SUPPORTED_KNOWLEDGE_EXTENSIONS = ['.pdf', '.docx', '.xlsx', '.csv', '.txt', '.md', '.json'] as const;
 
 export type KnowledgeFormat = 'pdf' | 'docx' | 'xlsx' | 'csv' | 'txt' | 'md' | 'json';
