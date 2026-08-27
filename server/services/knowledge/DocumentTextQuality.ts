@@ -122,6 +122,9 @@ export function assessDocumentTextQuality(
   const whitespaceCharacters = count(text, /\s/g);
   const letters = arabicCharacters + latinCharacters;
   const arabicCharacterRatio = letters > 0 ? arabicCharacters / letters : 0;
+  const arabicPresentationFormRatio = visibleCharacters > 0
+    ? arabicPresentationFormCharacters / visibleCharacters
+    : 0;
   const whitespaceRatio = text.length > 0 ? whitespaceCharacters / text.length : 0;
   const pageCountValue = Math.floor(Number(options.pageCount || 0));
   const pageCount = Number.isFinite(pageCountValue) && pageCountValue > 0 ? pageCountValue : 0;
