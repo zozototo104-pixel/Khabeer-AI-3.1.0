@@ -33,7 +33,7 @@ RUN apt-get update \
 # build time so production requests never depend on downloading model files.
 RUN python3 -m venv /opt/docling \
   && /opt/docling/bin/pip install --no-cache-dir --upgrade pip \
-  && /opt/docling/bin/pip install --no-cache-dir "docling-slim[format-pdf,models-local,feat-ocr-rapidocr,cli]" --extra-index-url https://download.pytorch.org/whl/cpu \
+  && /opt/docling/bin/pip install --no-cache-dir "docling-slim[format-pdf,models-local,feat-ocr-rapidocr,cli]" scipy --extra-index-url https://download.pytorch.org/whl/cpu \
   && mkdir -p /opt/docling-models \
   && /opt/docling/bin/docling-tools models download layout tableformer rapidocr --rapidocr-backend-lang onnxruntime:arabic -o /opt/docling-models
 
