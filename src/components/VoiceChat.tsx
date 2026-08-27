@@ -1879,11 +1879,16 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
             ? Math.max(0.045, noiseFloorRef.current * 3.0)
             : Math.max(0.005, noiseFloorRef.current * 1.5);
 
-          // Echo guard without changing the regression-protected thresholds:
-          // a strong nearby human voice still interrupts after 6 frames, while
-          // borderline energy during AI playback needs 8 consistent frames.
-          const strongBargeIn = isAiPlaying && rms >= startThreshold * 1.35;
-          const requiredSpeechFrames = isAiPlaying ? (strongBargeIn ? 6 : 8) : 2;
+          // Near-end speech / echo guard. The previous 6/8-frame RMS-only gate
+          // repeatedly classified the expert's own iPhone speaker output as a
+          // USER_BARGE_IN (production traces showed false triggers around
+          // RMS 0.096-0.124). Keep fast interruption only for unmistakably
+          // close speech; ordinary above-threshold energy must persist longer.
+          // This is deliberately conservative until the server-side Silero VAD
+          // confirmation path is active: false interruption is substantially
+          // worse than ~0.5s additional barge-in latency.
+          const strongBargeIn = isAiPlaying && rms >= Math.max(0.145, startThreshold * 1.70);
+          const requiredSpeechFrames = isAiPlaying ? (strongBargeIn ? 7 : 12) : 2;
           const isCurrentlySpeaking = vadSpeechFramesRef.current >= requiredSpeechFrames;
           const speechThreshold = isCurrentlySpeaking ? stopThreshold : startThreshold;
 
