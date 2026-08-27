@@ -77,14 +77,40 @@ try {
   parentPort.postMessage({ type: 'init_error', error: error && error.message ? error.message : String(error) });
 }
 
+function verifiedSpeech(samples) {
+  if (!vad) throw new Error('VAD_WORKER_NOT_READY');
+  vad.reset();
+  for (let offset = 0; offset < samples.length; offset += 512) {
+    const source = samples.subarray(offset, Math.min(samples.length, offset + 512));
+    const frame = source.length === 512 ? source : (() => { const p = new Float32Array(512); p.set(source); return p; })();
+    vad.acceptWaveform(frame);
+  }
+  const active = vad.isDetected();
+  vad.flush();
+  const parts = [];
+  let length = 0;
+  while (!vad.isEmpty()) {
+    const segment = vad.front();
+    const part = Float32Array.from(segment.samples || []);
+    if (part.length) { parts.push(part); length += part.length; }
+    vad.pop();
+  }
+  const merged = new Float32Array(length);
+  let cursor = 0;
+  for (const part of parts) { merged.set(part, cursor); cursor += part.length; }
+  return { detected: active || length >= 3200, samples: merged };
+}
+
 parentPort.on('message', (message) => {
   if (!message || message.type !== 'embed') return;
   const id = message.id;
   try {
     if (!extractor) throw new Error('SPEAKER_WORKER_NOT_READY');
-    const samples = new Float32Array(message.buffer);
+    const rawSamples = new Float32Array(message.buffer);
+    const verified = verifiedSpeech(rawSamples);
+    if (!verified.detected || verified.samples.length < 8000) throw new Error('NO_VERIFIED_SPEECH');
     const stream = extractor.createStream();
-    stream.acceptWaveform({ sampleRate: 16000, samples });
+    stream.acceptWaveform({ sampleRate: 16000, samples: verified.samples });
     stream.inputFinished();
     if (!extractor.isReady(stream)) throw new Error('INSUFFICIENT_AUDIO_FOR_NEURAL_EMBEDDING');
     const embedding = extractor.compute(stream, false);
