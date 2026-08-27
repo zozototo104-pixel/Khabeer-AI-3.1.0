@@ -330,7 +330,7 @@ async function extractPdfWithVerifiedOcr(
           const tesseract = await runOcrProcess(
             'tesseract',
             [imagePath, 'stdout', '-l', 'ara+eng', '--psm', '3', '-c', 'preserve_interword_spaces=1'],
-            120_000,
+            Math.max(5_000, Math.min(120_000, remainingOcrBudgetMs())),
           );
           extracted = tesseract.stdout.trim();
         } catch (error) {
