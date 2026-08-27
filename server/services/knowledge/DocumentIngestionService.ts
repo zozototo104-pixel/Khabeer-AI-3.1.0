@@ -215,7 +215,11 @@ export async function extractNativeDocumentText(
     try {
       const result = await parser.getText();
       const pdfParseText = result.text || '';
-      let text = pdfParseText;
+      // PDF font maps often expose Arabic Presentation Forms. Compatibility
+      // normalization converts those glyph forms to logical Arabic code points
+      // without touching the original PDF bytes.
+      const normalizedPdfParseText = pdfParseText.normalize('NFKC');
+      let text = normalizedPdfParseText;
 
       // pdf.js/pdf-parse can expose Arabic glyphs in PDF content-stream order,
       // which is often different from human RTL reading order. Poppler's
