@@ -214,8 +214,44 @@ export async function extractNativeDocumentText(
     const parser = new PDFParse({ data: buffer });
     try {
       const result = await parser.getText();
+      const pdfParseText = result.text || '';
+      let text = pdfParseText;
+
+      // pdf.js/pdf-parse can expose Arabic glyphs in PDF content-stream order,
+      // which is often different from human RTL reading order. Poppler's
+      // pdftotext is already installed in the production image and generally
+      // reconstructs reading order better. Use it only for clearly Arabic
+      // text PDFs; if it is unavailable or produces weak output, keep the
+      // existing parser result and let the normal OCR-quality fallback decide.
+      const arabicChars = (pdfParseText.match(/[\u0600-\u06FF]/g) || []).length;
+      const visibleChars = (pdfParseText.match(/[^\s]/g) || []).length;
+      const isClearlyArabic = visibleChars >= 40 && arabicChars / visibleChars >= 0.2;
+
+      if (isClearlyArabic) {
+        let workDir = '';
+        try {
+          workDir = await mkdtemp(path.join(tmpdir(), 'khabeer-pdf-'));
+          const inputPath = path.join(workDir, 'document.pdf');
+          await writeFile(inputPath, buffer);
+          const { stdout } = await execFileAsync('pdftotext', ['-enc', 'UTF-8', inputPath, '-'], {
+            encoding: 'utf8',
+            maxBuffer: 8 * 1024 * 1024,
+            timeout: 45_000,
+          });
+          const popplerText = normalizeExtractedDocumentText(stdout || '');
+          const popplerArabic = (popplerText.match(/[\u0600-\u06FF]/g) || []).length;
+          if (popplerText.length >= 40 && popplerArabic >= Math.min(20, arabicChars)) {
+            text = popplerText;
+          }
+        } catch (error) {
+          console.warn('[KnowledgePDF] pdftotext Arabic reading-order fallback unavailable; keeping pdf-parse output:', error instanceof Error ? error.message : error);
+        } finally {
+          if (workDir) await rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+        }
+      }
+
       return {
-        text: result.text || '',
+        text,
         pageCount: Number(result.total || result.pages?.length || 0),
         isPdf: true,
         format,
