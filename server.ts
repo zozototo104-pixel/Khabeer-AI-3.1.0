@@ -436,11 +436,12 @@ async function extractPdfWithVerifiedOcr(
       throw new Error('تعذر استخراج أي صفحة نصية موثوقة من ملف PDF حتى بعد OCR المحلي وقراءة الصور الاحتياطية.');
     }
 
+    failedPages.sort((a, b) => a - b);
     const warning = failedPages.length
-      ? `[ملاحظة جودة: تم استخراج ${usablePages} من ${pageCount} صفحة. الصفحات التي تحتاج مراجعة الأصل: ${failedPages.join(', ')}]\n\n`
+      ? `[ملاحظة جودة: تم استخراج ${usablePages} من ${pageCount} صفحة. الصفحات التي تحتاج مراجعة الأصل: ${failedPages.join(', ')}${ocrBudgetExhausted ? '. توقفت معالجة OCR عند بلوغ المهلة الآمنة مع الاحتفاظ بكل النص الموثوق المستخرج' : ''}]\n\n`
       : '';
 
-    console.log('PDF hybrid OCR completed', { fileName, pageCount, usablePages, failedPages });
+    console.log('PDF hybrid OCR completed', { fileName, pageCount, usablePages, failedPages, ocrBudgetExhausted });
     return warning + pageTexts.join('\n\n');
   } finally {
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
