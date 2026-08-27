@@ -415,12 +415,22 @@ async function extractPdfWithVerifiedOcr(
 
     const worker = async () => {
       while (nextOcrIndex < pagesNeedingOcr.length) {
+        if (remainingOcrBudgetMs() <= 0) {
+          ocrBudgetExhausted = true;
+          return;
+        }
         const index = pagesNeedingOcr[nextOcrIndex++];
         await processPage(index);
       }
     };
 
     await Promise.all(Array.from({ length: Math.min(2, pagesNeedingOcr.length) }, () => worker()));
+
+    // A deadline is a partial-quality condition, not a whole-document failure.
+    // Preserve all pages already extracted and explicitly mark untouched pages.
+    for (const index of pagesNeedingOcr) {
+      if (!pageTexts[index]) markPageUnavailable(index);
+    }
 
     if (usablePages === 0) {
       throw new Error('تعذر استخراج أي صفحة نصية موثوقة من ملف PDF حتى بعد OCR المحلي وقراءة الصور الاحتياطية.');
