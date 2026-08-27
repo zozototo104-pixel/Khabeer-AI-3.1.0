@@ -393,38 +393,43 @@ async function extractPdfWithVerifiedOcr(
         });
       }
 
+      // Corrupted/scanned Arabic PDFs are deliberately vision-first. Tesseract
+      // has a known RTL/searchable-PDF ordering limitation and can emit plausible
+      // looking but logically fragmented Arabic. A page that already failed the
+      // native PDF quality gate must therefore NOT trust Tesseract as its primary
+      // source. Rasterize once, read the visual page with Gemini, then use local
+      // Tesseract only as an offline/service-unavailable fallback.
       if (imagePath) {
-        try {
-          const tesseract = await runOcrProcess(
-            'tesseract',
-            [imagePath, 'stdout', '-l', 'ara+eng', '--psm', '3', '-c', 'preserve_interword_spaces=1'],
-            Math.max(5_000, Math.min(120_000, remainingOcrBudgetMs())),
-          );
-          extracted = tesseract.stdout.trim();
-        } catch (error) {
-          console.warn('Local Arabic OCR page failed', {
-            fileName,
-            pageNumber,
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        extracted = await readPageWithGemini(imagePath, pageNumber);
       }
 
-      // Tesseract can return a long string that is technically Unicode Arabic
-      // but consists of isolated visual glyphs ("ا ل ...") when the scan/font
-      // is difficult. Character-count checks alone must never accept that as
-      // knowledge-base text. Apply the same full Arabic quality gate used for
-      // native PDF extraction, and escalate the page to vision OCR when needed.
       let extractedQuality = assessDocumentTextQuality(extracted, { pageCount: 1 });
       if ((!isUsefulOcrPage(extracted) || !extractedQuality.usable) && imagePath) {
-        console.log('Tesseract page rejected by quality gate; escalating to vision OCR', {
+        console.log('Vision OCR unavailable/rejected; trying local Tesseract fallback', {
           fileName,
           pageNumber,
           reason: extractedQuality.reason,
           reasons: extractedQuality.reasons,
         });
-        extracted = await readPageWithGemini(imagePath, pageNumber);
-        extractedQuality = assessDocumentTextQuality(extracted, { pageCount: 1 });
+        try {
+          const tesseract = await runOcrProcess(
+            'tesseract',
+            [imagePath, 'stdout', '-l', 'ara+eng', '--psm', '3'],
+            Math.max(5_000, Math.min(120_000, remainingOcrBudgetMs())),
+          );
+          const localText = tesseract.stdout.trim();
+          const localQuality = assessDocumentTextQuality(localText, { pageCount: 1 });
+          if (isUsefulOcrPage(localText) && localQuality.usable) {
+            extracted = localText;
+            extractedQuality = localQuality;
+          }
+        } catch (error) {
+          console.warn('Local Arabic OCR fallback failed', {
+            fileName,
+            pageNumber,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
 
       if (isUsefulOcrPage(extracted) && extractedQuality.usable) {
