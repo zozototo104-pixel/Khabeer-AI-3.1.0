@@ -111,7 +111,10 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
     setIsUploading(true);
     setStatusMessage(null);
     try {
-      const activeToken = propToken || await getAuthToken();
+      // Prefer a freshly resolved Firebase ID token for long-lived mobile/PWA
+      // sessions. propToken may have been captured at sign-in and can expire
+      // while the Knowledge Base page stays open for an extended period.
+      const activeToken = await getAuthToken() || propToken;
       if (!activeToken) {
         throw new Error('يرجى التحقق من تسجيل الدخول أولاً');
       }
