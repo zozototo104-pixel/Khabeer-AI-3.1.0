@@ -95,7 +95,7 @@ test('K4: binary OOXML/PDF bytes are parsed and never subjected to raw UTF-8 val
 
 test('K5: malformed binary files return a controlled 4xx error code', async () => {
   for (const [fileName, mimeType, expectedCode] of [
-    ['bad.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'MALFORMED_XLSX'],
+    ['bad.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'XLSX_SIGNATURE_MISMATCH'],
     ['bad.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'MALFORMED_DOCX'],
     ['bad.pdf', 'application/pdf', 'MALFORMED_PDF'],
   ] as const) {
