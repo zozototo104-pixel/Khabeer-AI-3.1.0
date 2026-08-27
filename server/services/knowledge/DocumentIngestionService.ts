@@ -244,7 +244,9 @@ export async function extractNativeDocumentText(
             maxBuffer: 8 * 1024 * 1024,
             timeout: 45_000,
           });
-          const popplerText = normalizeExtractedDocumentText(stdout || '').normalize('NFKC');
+          const popplerText = normalizeExtractedDocumentText(stdout || '')
+            .normalize('NFKC')
+            .replace(/[\u202A-\u202E\u2066-\u2069]/g, '');
           const popplerArabic = (popplerText.match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/g) || []).length;
           if (popplerText.length >= 40 && popplerArabic >= Math.min(20, arabicChars)) {
             text = popplerText;
