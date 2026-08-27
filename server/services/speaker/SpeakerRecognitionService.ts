@@ -205,6 +205,7 @@ export class SpeakerRecognitionService {
           workerData: {
             cwd: process.cwd(),
             modelPath: this.modelPath,
+            vadModelPath: path.resolve(path.dirname(this.modelPath), 'silero_vad.onnx'),
             numThreads: safeThreadCount(),
             debug: process.env.SPEAKER_MODEL_DEBUG === 'true',
             provider: process.env.SPEAKER_EXECUTION_PROVIDER || 'cpu',
