@@ -3497,31 +3497,10 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
         });
         logKnowledge('KnowledgeUpload:SUCCESS', 'source_saved_background_processing');
 
-        setImmediate(async () => {
-          try {
-            await db.update(knowledge).set({ processingStatus: 'PROCESSING', processingError: null }).where(eq(knowledge.id, pendingDoc.id));
-            const background = await runKnowledgeIngestion({ buffer: sourceBuffer, fileName: originalName, mimeType }, {
-              ocrPdf: extractPdfWithVerifiedOcr,
-              persist: async (prepared) => {
-                const pageMatches = prepared.content.match(/\[\[(?:الصفحة|PAGE)\s+\d+\]\]/gi);
-                await db.update(knowledge).set({
-                  content: prepared.content,
-                  processingStatus: 'COMPLETE',
-                  processingError: null,
-                  processedPages: pageMatches?.length || 0,
-                  updatedAt: new Date(),
-                }).where(eq(knowledge.id, pendingDoc.id));
-                return pendingDoc;
-              },
-            });
-            if (background?.prepared) ragEngine.invalidateOrganization(org.id);
-            console.log(`[KnowledgeUpload:BACKGROUND_COMPLETE] id=${pendingDoc.id} file=${originalName}`);
-          } catch (error: any) {
-            const message = String(error?.message || error || 'PDF_PROCESSING_FAILED').slice(0, 1000);
-            console.error(`[KnowledgeUpload:BACKGROUND_FAILED] id=${pendingDoc.id}`, error);
-            await db.update(knowledge).set({ processingStatus: 'FAILED', processingError: message, updatedAt: new Date() }).where(eq(knowledge.id, pendingDoc.id)).catch(() => undefined);
-          }
-        });
+        // Never run heavy PDF extraction in the request lifecycle. Queue the
+        // durable DB-backed worker so a proxy response can complete first and
+        // any Render restart can resume the job from PENDING/PROCESSING.
+        scheduleKnowledgeWorker(1500);
         return;
       }
 
