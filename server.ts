@@ -757,6 +757,107 @@ function sanitizeOrganizationInput(input: unknown): Record<string, unknown> {
   return output;
 }
 
+let knowledgeWorkerRunning = false;
+let knowledgeWorkerTimer: NodeJS.Timeout | null = null;
+
+function scheduleKnowledgeWorker(delayMs = 0) {
+  if (knowledgeWorkerRunning || knowledgeWorkerTimer) return;
+  knowledgeWorkerTimer = setTimeout(() => {
+    knowledgeWorkerTimer = null;
+    void drainKnowledgeProcessingQueue();
+  }, Math.max(0, delayMs));
+  knowledgeWorkerTimer.unref?.();
+}
+
+async function drainKnowledgeProcessingQueue() {
+  if (knowledgeWorkerRunning) return;
+  knowledgeWorkerRunning = true;
+  try {
+    const { db } = await import('./src/db/index.ts');
+    const { knowledge, knowledgeFiles } = await import('./src/db/schema.ts');
+    const { asc, eq, or } = await import('drizzle-orm');
+
+    while (true) {
+      const jobs = await db.select({
+        id: knowledge.id,
+        orgId: knowledge.orgId,
+        title: knowledge.title,
+        processingStatus: knowledge.processingStatus,
+        fileName: knowledgeFiles.fileName,
+        mimeType: knowledgeFiles.mimeType,
+        data: knowledgeFiles.data,
+      }).from(knowledge)
+        .innerJoin(knowledgeFiles, eq(knowledgeFiles.knowledgeId, knowledge.id))
+        .where(or(
+          eq(knowledge.processingStatus, 'PENDING'),
+          eq(knowledge.processingStatus, 'PROCESSING'),
+        ))
+        .orderBy(asc(knowledge.createdAt))
+        .limit(1);
+
+      const job = jobs[0];
+      if (!job) break;
+
+      const sourceBuffer = Buffer.isBuffer(job.data) ? job.data : Buffer.from(job.data as any);
+      await db.update(knowledge).set({
+        processingStatus: 'PROCESSING',
+        processingError: null,
+        updatedAt: new Date(),
+      }).where(eq(knowledge.id, job.id));
+
+      console.log('[KnowledgeWorker:START]', {
+        id: job.id,
+        orgId: job.orgId,
+        fileName: job.fileName,
+        previousStatus: job.processingStatus,
+        sizeBytes: sourceBuffer.length,
+      });
+
+      try {
+        const background = await runKnowledgeIngestion({
+          buffer: sourceBuffer,
+          fileName: job.fileName || job.title || 'document.pdf',
+          mimeType: job.mimeType || 'application/pdf',
+        }, {
+          ocrPdf: extractPdfWithVerifiedOcr,
+          persist: async (prepared) => {
+            const pageMatches = prepared.content.match(/\[\[(?:الصفحة|PAGE)\s+\d+\]\]/gi);
+            await db.update(knowledge).set({
+              content: prepared.content,
+              pageCount: prepared.pageCount || null,
+              processingStatus: 'COMPLETE',
+              processingError: null,
+              processedPages: pageMatches?.length || prepared.pageCount || 0,
+              updatedAt: new Date(),
+            }).where(eq(knowledge.id, job.id));
+            return { id: job.id };
+          },
+        });
+
+        if (background?.prepared) ragEngine.invalidateOrganization(job.orgId);
+        console.log('[KnowledgeWorker:COMPLETE]', {
+          id: job.id,
+          orgId: job.orgId,
+          fileName: job.fileName,
+          pageCount: background?.prepared?.pageCount || 0,
+        });
+      } catch (error: any) {
+        const message = String(error?.message || error || 'PDF_PROCESSING_FAILED').slice(0, 1000);
+        console.error('[KnowledgeWorker:FAILED]', { id: job.id, fileName: job.fileName, error: message });
+        await db.update(knowledge).set({
+          processingStatus: 'FAILED',
+          processingError: message,
+          updatedAt: new Date(),
+        }).where(eq(knowledge.id, job.id));
+      }
+    }
+  } catch (error) {
+    console.error('[KnowledgeWorker:LOOP_FAILED]', error);
+  } finally {
+    knowledgeWorkerRunning = false;
+  }
+}
+
 async function startServer() {
   const app = express();
   app.disable('x-powered-by');
