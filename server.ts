@@ -276,23 +276,49 @@ async function extractPdfWithVerifiedOcr(
     }
 
     assertOcrBudget();
-    const pagePrefix = path.join(tempDir, 'page');
-    await runOcrProcess(
-      'pdftoppm',
-      ['-f', '1', '-l', String(pageCount), '-r', '170', '-png', pdfPath, pagePrefix],
-      Math.max(10_000, Math.min(Math.max(180_000, pageCount * 8_000), remainingOcrBudgetMs())),
-    );
 
-    const files = (await fs.readdir(tempDir))
-      .filter((name) => /^page-\d+\.png$/i.test(name))
-      .sort((a, b) => Number(a.match(/(\d+)/)?.[1] || 0) - Number(b.match(/(\d+)/)?.[1] || 0));
-
-    if (!files.length) throw new Error('تعذر تحويل صفحات PDF إلى صور للقراءة الآلية.');
-
+    // First salvage text page-by-page with Poppler. Large PDFs often contain
+    // mostly healthy searchable pages and only a few scanned/broken pages.
     const pageTexts = new Array<string>(pageCount);
     const failedPages: number[] = [];
-    let nextPageIndex = 0;
+    const pagesNeedingOcr: number[] = [];
     let usablePages = 0;
+
+    try {
+      const direct = await runOcrProcess(
+        'pdftotext',
+        ['-enc', 'UTF-8', '-f', '1', '-l', String(pageCount), pdfPath, '-'],
+        Math.max(10_000, Math.min(60_000, remainingOcrBudgetMs())),
+      );
+      const directPages = String(direct.stdout || '').split('\f');
+      for (let index = 0; index < pageCount; index++) {
+        const normalized = String(directPages[index] || '')
+          .normalize('NFKC')
+          .replace(/[\u202A-\u202E\u2066-\u2069]/g, '')
+          .trim();
+        if (isUsefulOcrPage(normalized)) {
+          usablePages += 1;
+          pageTexts[index] = `[[الصفحة ${index + 1}]]\n${normalized}`;
+        } else {
+          pagesNeedingOcr.push(index);
+        }
+      }
+    } catch (error) {
+      console.warn('Poppler page-text salvage failed; OCR will handle pages', {
+        fileName,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      for (let index = 0; index < pageCount; index++) pagesNeedingOcr.push(index);
+    }
+
+    console.log('PDF hybrid OCR planning', {
+      fileName,
+      pageCount,
+      directTextPages: usablePages,
+      pagesNeedingOcr: pagesNeedingOcr.length,
+    });
+
+    let nextOcrIndex = 0;
 
     const readPageWithGemini = async (imagePath: string, pageNumber: number): Promise<string> => {
       try {
