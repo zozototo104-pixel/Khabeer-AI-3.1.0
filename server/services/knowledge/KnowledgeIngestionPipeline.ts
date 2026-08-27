@@ -33,18 +33,49 @@ export interface KnowledgeIngestionDependencies<T> {
   onStage?: (stage: KnowledgeStage) => void;
 }
 
+function logPdfStage(stage: string, fields: Record<string, unknown>): void {
+  console.log(`[KnowledgePDF:${stage}]`, fields);
+}
+
 export async function prepareKnowledgeDocument(
   source: KnowledgeUploadSource,
   options: Pick<KnowledgeIngestionDependencies<unknown>, 'ocrPdf' | 'onStage'> = {},
 ): Promise<PreparedKnowledgeDocument> {
+  const isPdfUpload = source.fileName.toLowerCase().endsWith('.pdf');
+  if (isPdfUpload) {
+    logPdfStage('EXTRACT_START', { extractionMethod: 'NATIVE_TEXT' });
+  }
   options.onStage?.('extract_start');
   const native = await extractNativeDocumentText(source.buffer, source.fileName, source.mimeType);
 
   let content = normalizeExtractedDocumentText(native.text);
   let extractionMethod: PreparedKnowledgeDocument['extractionMethod'] = 'NATIVE_TEXT';
-  let quality = assessDocumentTextQuality(content);
+  let quality = assessDocumentTextQuality(content, { pageCount: native.pageCount });
+
+  if (native.isPdf) {
+    logPdfStage('EXTRACT_DONE', {
+      pageCount: native.pageCount,
+      extractionMethod,
+      textLength: content.length,
+    });
+    logPdfStage('QUALITY_CHECK', {
+      pageCount: native.pageCount,
+      extractionMethod,
+      textLength: content.length,
+      usable: quality.usable,
+      reason: quality.reason,
+      reasons: quality.reasons,
+    });
+  }
 
   if (native.isPdf && !quality.usable) {
+    logPdfStage('FALLBACK', {
+      pageCount: native.pageCount,
+      extractionMethod: 'VERIFIED_OCR',
+      nativeTextLength: content.length,
+      reason: quality.reason,
+      reasons: quality.reasons,
+    });
     if (!options.ocrPdf) {
       throw new KnowledgeDocumentError(
         'PDF_TEXT_EXTRACTION_FAILED',
@@ -55,8 +86,16 @@ export async function prepareKnowledgeDocument(
     try {
       const ocrText = await options.ocrPdf(source.buffer, source.fileName, native.pageCount);
       content = normalizeExtractedDocumentText(ocrText);
-      quality = assessDocumentTextQuality(content);
+      quality = assessDocumentTextQuality(content, { pageCount: native.pageCount });
       extractionMethod = 'VERIFIED_OCR';
+      logPdfStage('QUALITY_CHECK', {
+        pageCount: native.pageCount,
+        extractionMethod,
+        textLength: content.length,
+        usable: quality.usable,
+        reason: quality.reason,
+        reasons: quality.reasons,
+      });
     } catch (error) {
       if (error instanceof KnowledgeDocumentError) throw error;
       throw new KnowledgeDocumentError(
@@ -106,8 +145,22 @@ export async function runKnowledgeIngestion<T>(
   dependencies: KnowledgeIngestionDependencies<T>,
 ): Promise<{ prepared: PreparedKnowledgeDocument; persisted: T }> {
   const prepared = await prepareKnowledgeDocument(source, dependencies);
+  if (prepared.isPdf) {
+    logPdfStage('INDEX_START', {
+      pageCount: prepared.pageCount,
+      extractionMethod: prepared.extractionMethod,
+      textLength: prepared.content.length,
+    });
+  }
   dependencies.onStage?.('index_start');
   const persisted = await dependencies.persist(prepared);
   dependencies.onStage?.('index_done');
+  if (prepared.isPdf) {
+    logPdfStage('INDEX_DONE', {
+      pageCount: prepared.pageCount,
+      extractionMethod: prepared.extractionMethod,
+      textLength: prepared.content.length,
+    });
+  }
   return { prepared, persisted };
 }
