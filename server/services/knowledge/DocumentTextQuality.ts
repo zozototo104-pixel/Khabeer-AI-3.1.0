@@ -38,6 +38,7 @@ export interface DocumentTextQualityOptions {
 }
 
 const ARABIC_RE = /[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]/g;
+const ARABIC_PRESENTATION_FORM_RE = /[\ufb50-\ufdff\ufe70-\ufeff]/g;
 const ARABIC_RUN_RE = /[\u0621-\u063a\u0641-\u064a\u066e-\u066f\u0671-\u06d3\u06fa-\u06fc\u0750-\u077f\u08a0-\u08c9]+/g;
 const ARABIC_ONLY_RE = /^[\u0621-\u063a\u0641-\u064a\u066e-\u066f\u0671-\u06d3\u06fa-\u06fc\u0750-\u077f\u08a0-\u08c9\u064b-\u065f\u0670\u06d6-\u06ed]+$/;
 const LATIN_RE = /[A-Za-z]/g;
