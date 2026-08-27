@@ -282,7 +282,11 @@ async function extractPdfWithVerifiedOcr(
     // order. RapidOCR/PP-OCR is bundled in the production image. If Docling is
     // unavailable or its result fails our quality gate, the existing verified
     // page-by-page pipeline below remains a fail-safe fallback.
-    if (process.env.DOCLING_PDF_ENABLED !== 'false') {
+    // Docling is intentionally opt-in on the web service. Its local layout/OCR
+    // stack can exceed the RAM/CPU envelope of a Render web instance and make
+    // the proxy return 502 while a document is being processed. Enable it only
+    // on a dedicated worker/instance with DOCLING_PDF_ENABLED=true.
+    if (process.env.DOCLING_PDF_ENABLED === 'true') {
       const doclingOutput = path.join(tempDir, 'docling-output');
       try {
         await fs.mkdir(doclingOutput, { recursive: true });
