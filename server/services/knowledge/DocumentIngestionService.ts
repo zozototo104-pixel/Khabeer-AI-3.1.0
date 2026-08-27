@@ -156,16 +156,25 @@ export async function extractNativeDocumentText(
     if (format === 'xlsx') {
       const excelJsModule: any = await import('exceljs');
       const ExcelJS = excelJsModule.default || excelJsModule;
-      const workbook = new ExcelJS.Workbook();
+      let workbook = new ExcelJS.Workbook();
       try {
         await workbook.xlsx.load(buffer);
-      } catch (error) {
-        throw new KnowledgeDocumentError(
-          'XLSX_PARSE_FAILED',
-          'تعذر على قارئ Excel فتح ملف XLSX. قد يستخدم الملف ميزة غير مدعومة أو تكون بنيته الداخلية غير قابلة للقراءة. أعد حفظه كملف XLSX جديد ثم حاول مجددًا.',
-          422,
-          error,
-        );
+      } catch (primaryError) {
+        // Some otherwise valid workbooks contain pathological worksheet merge
+        // metadata (for example, thousands of empty merges extending to XFD).
+        // Merge layout is irrelevant to plain-text ingestion, so retry without
+        // parsing mergeCells while keeping the original binary Buffer intact.
+        workbook = new ExcelJS.Workbook();
+        try {
+          await workbook.xlsx.load(buffer, { ignoreNodes: ['mergeCells'] });
+        } catch (fallbackError) {
+          throw new KnowledgeDocumentError(
+            'XLSX_PARSE_FAILED',
+            'تعذر على قارئ Excel فتح ملف XLSX. قد يستخدم الملف ميزة غير مدعومة أو تكون بنيته الداخلية غير قابلة للقراءة. أعد حفظه كملف XLSX جديد ثم حاول مجددًا.',
+            422,
+            fallbackError instanceof Error ? fallbackError : primaryError,
+          );
+        }
       }
       const sections: string[] = [];
 
