@@ -22,6 +22,17 @@ test('rejects broken Arabic font-map script transitions', () => {
   assert.match(result.reason, /font|mixed|mojibake|symbols/);
 });
 
+test('rejects Arabic presentation-form glyph extraction while preserving mixed text', () => {
+  const extractedPdfGlyphs = 'اﻟﻤﻌﺪّﻟﺔ اﻟﻨﺴﺨﺔ ﻫﺬه ﻋﻠﻰ ﻣﻼﺣﻈﺔ اﻟﺘﻘﺮﻳﺮ اﻟﺮﻗﺎﺑﻲ اﻟﻨﻬﺎﺋﻲ ﻟﻠﻤﺆﺳﺴﺔ';
+  const broken = assessDocumentTextQuality(extractedPdfGlyphs, { pageCount: 1 });
+  assert.equal(broken.usable, false);
+  assert.equal(broken.reason, 'arabic_presentation_form_extraction');
+  assert.ok(broken.metrics.arabicPresentationFormCharacters >= 20);
+
+  const mixed = assessDocumentTextQuality('تقرير الأداء Media Performance لشهر مايو 2026 يتضمن KPIs واضحة ونتائج سليمة.');
+  assert.equal(mixed.usable, true);
+});
+
 test('buildPdfPageRanges validates chunking', () => {
   assert.deepEqual(buildPdfPageRanges(45, 20), [
     { start: 1, end: 20 },
