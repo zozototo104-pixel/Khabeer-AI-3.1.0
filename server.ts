@@ -361,13 +361,23 @@ async function extractPdfWithVerifiedOcr(
         // OCR predicate only measures character presence, so use the full
         // Arabic quality gate per page before trusting native PDF text.
         const directQuality = assessDocumentTextQuality(normalized, { pageCount: 1 });
-        if (isUsefulOcrPage(normalized) && directQuality.usable) {
+        const visibleChars = (normalized.match(/\S/g) || []).length;
+        const arabicChars = (normalized.match(/[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/g) || []).length;
+        const clearlyArabicPage = arabicChars >= 20 && arabicChars / Math.max(1, visibleChars) >= 0.08;
+
+        // This function is reached only after the document's native extraction
+        // has already failed the PDF quality gate. Do not re-trust native text
+        // for Arabic pages here: broken RTL/font maps can still look like valid
+        // Unicode and pass character-level heuristics while words are visually
+        // fragmented. Arabic pages must be reconstructed from the rendered page.
+        if (!clearlyArabicPage && isUsefulOcrPage(normalized) && directQuality.usable) {
           usablePages += 1;
           pageTexts[index] = `[[الصفحة ${index + 1}]]\n${normalized}`;
         } else {
-          console.log('PDF native page rejected by quality gate; forcing OCR', {
+          console.log('PDF page requires verified visual OCR', {
             fileName,
             pageNumber: index + 1,
+            clearlyArabicPage,
             reason: directQuality.reason,
             reasons: directQuality.reasons,
           });
