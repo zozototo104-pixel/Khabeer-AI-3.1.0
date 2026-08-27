@@ -341,7 +341,7 @@ export class SpeakerRecognitionService {
         reject(new Error('SPEAKER_WORKER_TIMEOUT'));
       }, 4500);
       this.pending.set(id, { resolve, reject, timer });
-      this.worker!.postMessage({ type: 'embed', id, buffer: copy.buffer }, [copy.buffer]);
+      this.worker!.postMessage({ type: 'embed', id, buffer: copy.buffer, bypassVad: options.bypassVad === true }, [copy.buffer]);
     });
   }
 
