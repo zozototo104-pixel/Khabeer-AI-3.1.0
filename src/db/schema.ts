@@ -27,7 +27,7 @@ export const users = pgTable('users', {
 
 export const organizations = pgTable('organizations', {
   id: serial('id').primaryKey(),
-  ownerId: text('owner_id').notNull(), // User's Firebase UID
+  ownerId: text('owner_id').notNull(), // User's Firebase Auth UID
   name: text('name'),
   industry: text('industry'),
   structure: text('structure'),
@@ -150,6 +150,7 @@ export const knowledge = pgTable('knowledge', {
   orgId: integer('org_id').references(() => organizations.id).notNull(),
   title: text('title'),
   content: text('content').notNull(),
+  pageCount: integer('page_count'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
   deletedAt: timestamp('deleted_at'),
@@ -277,7 +278,7 @@ export const expertFindings = pgTable('expert_findings', {
 
 export const consultationCalls = pgTable('consultation_calls', {
   id: serial('id').primaryKey(),
-  orgId: integer('org_id').references(() => organizations.id).notNull(),
+  orgId: integer('org_id').references(() => organizations.id),
   sessionId: integer('session_id').references(() => sessions.id),
   provider: text('provider').notNull(),
   externalCallId: text('external_call_id'),
