@@ -5026,6 +5026,9 @@ console.log(
 
   server.listen(PORT, HOST, () => {
     console.log(`Server running on http://${HOST}:${PORT}`);
+    // Resume durable knowledge jobs only after the HTTP server is accepting
+    // traffic. A short delay protects Render health checks during cold start.
+    scheduleKnowledgeWorker(5000);
     // Pre-warm neural speaker recognition model
     import('./server/services/speaker/SpeakerRecognitionService.ts')
       .then(({ speakerRecognitionService }) => speakerRecognitionService.checkHealth())
