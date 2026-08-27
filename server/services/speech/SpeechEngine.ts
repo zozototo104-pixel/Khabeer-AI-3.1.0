@@ -311,7 +311,21 @@ export class SpeechEngine {
     let embedding: number[] | undefined;
 
     if (initialPcmOrEmbedding instanceof Float32Array) {
-      embedding = await this.provider.extractEmbedding(initialPcmOrEmbedding);
+      // Build a small voice gallery even from a single enrollment recording.
+      // One long embedding is fragile across microphone distance, room noise
+      // and speaking style. Reuse the same quality-window selector as live
+      // diarization so enrollment and recognition see acoustically comparable
+      // 2-second windows from the exact same neural model.
+      const windows = selectSpeakerWindows(initialPcmOrEmbedding, 3);
+      const enrollmentEmbeddings = await Promise.all(
+        (windows.length ? windows : [initialPcmOrEmbedding]).map((window) => this.provider.extractEmbedding(window)),
+      );
+      const first = enrollmentEmbeddings[0];
+      const profile = registry.registerOrUpdateSpeaker(name, first, { embeddingModel: this.provider.getModelId() });
+      for (const sampleEmbedding of enrollmentEmbeddings.slice(1)) {
+        registry.updateSpeaker(profile.id, sampleEmbedding, 'HIGH', true);
+      }
+      return profile;
     } else if (Array.isArray(initialPcmOrEmbedding)) {
       embedding = initialPcmOrEmbedding;
     }
