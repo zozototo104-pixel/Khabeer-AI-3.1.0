@@ -319,6 +319,7 @@ async function extractPdfWithVerifiedOcr(
     };
 
     const processPage = async (index: number) => {
+      assertOcrBudget();
       const pageNumber = index + 1;
       const imageName = files[index];
       const imagePath = imageName ? path.join(tempDir, imageName) : '';
