@@ -246,6 +246,14 @@ async function extractPdfWithVerifiedOcr(
   totalPages: number,
 ): Promise<string> {
   const maximumPages = 200;
+  const totalOcrBudgetMs = 6 * 60_000;
+  const ocrStartedAt = Date.now();
+  const remainingOcrBudgetMs = () => totalOcrBudgetMs - (Date.now() - ocrStartedAt);
+  const assertOcrBudget = () => {
+    if (remainingOcrBudgetMs() <= 0) {
+      throw new Error('انتهت المهلة الآمنة لاستخراج PDF بالـ OCR. الملف كبير أو يعتمد على صور كثيرة؛ يرجى استخدام نسخة PDF قابلة للبحث أو تقسيمه إلى أجزاء أصغر.');
+    }
+  };
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'smart-expert-pdf-'));
   const pdfPath = path.join(tempDir, 'source.pdf');
 
