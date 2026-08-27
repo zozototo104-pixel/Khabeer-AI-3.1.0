@@ -107,7 +107,9 @@ parentPort.on('message', (message) => {
   try {
     if (!extractor) throw new Error('SPEAKER_WORKER_NOT_READY');
     const rawSamples = new Float32Array(message.buffer);
-    const verified = verifiedSpeech(rawSamples);
+    const verified = message.bypassVad
+      ? { detected: true, samples: rawSamples }
+      : verifiedSpeech(rawSamples);
     if (!verified.detected || verified.samples.length < 8000) throw new Error('NO_VERIFIED_SPEECH');
     const stream = extractor.createStream();
     stream.acceptWaveform({ sampleRate: 16000, samples: verified.samples });
