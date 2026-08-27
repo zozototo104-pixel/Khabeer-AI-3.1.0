@@ -198,6 +198,19 @@ export function assessDocumentTextQuality(
     return reject('suspected_mojibake');
   }
 
+  // Arabic Presentation Forms are legitimate Unicode glyph code points, but
+  // native PDF extraction should normally return logical Arabic letters. A
+  // substantial share of presentation-form glyphs indicates that the PDF's
+  // font mapping exposed visual glyph codes instead of reusable text. Treat
+  // only a strong signal as unusable so ordinary Arabic and mixed documents
+  // are unaffected and can fall back to OCR at the pipeline level.
+  if (
+    arabicPresentationFormCharacters >= 20
+    && arabicPresentationFormRatio >= 0.08
+  ) {
+    return reject('arabic_presentation_form_extraction');
+  }
+
   // Broken Arabic PDF ToUnicode maps frequently produce text that alternates
   // between Arabic glyphs and stray Latin letters with no word boundary.
   // Normal bilingual documents almost always separate the two scripts with
