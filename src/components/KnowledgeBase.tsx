@@ -632,11 +632,40 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
                           <span>تم الرفع: {formatDate(doc.createdAt)}</span>
                           <span>•</span>
                           <span className="text-slate-400 font-mono">
-                            {doc.content ? `${Math.round(doc.content.length / 100) / 10}k حرف` : 'مفهرس'}
+                            {doc.processingStatus === 'PENDING' || doc.processingStatus === 'PROCESSING'
+                              ? 'قيد المعالجة'
+                              : doc.processingStatus === 'FAILED'
+                                ? 'فشل الاستخراج'
+                                : doc.content ? `${Math.round(doc.content.length / 100) / 10}k حرف` : 'مفهرس'}
                           </span>
                         </div>
                       </div>
                     </div>
+
+                    {(doc.processingStatus === 'PENDING' || doc.processingStatus === 'PROCESSING' || doc.processingStatus === 'FAILED') && (() => {
+                      const progress = getProcessingProgress(doc);
+                      const isFailed = doc.processingStatus === 'FAILED';
+                      return (
+                        <div className={`rounded-2xl border p-3 text-xs ${isFailed ? 'bg-rose-500/10 border-rose-500/20 text-rose-200' : 'bg-blue-500/10 border-blue-500/20 text-blue-200'}`}>
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <span className="font-bold flex items-center gap-1.5">
+                              {isFailed ? <AlertCircle className="w-3.5 h-3.5" /> : <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                              {isFailed ? 'فشلت معالجة المستند' : doc.processingStatus === 'PENDING' ? 'بانتظار بدء المعالجة' : 'جاري استخراج وفهرسة PDF'}
+                            </span>
+                            {!isFailed && progress.pageCount > 0 && <span className="font-mono">{progress.percent}%</span>}
+                          </div>
+                          {!isFailed && progress.pageCount > 0 && (
+                            <>
+                              <div className="h-1.5 rounded-full bg-slate-800 overflow-hidden mb-1.5">
+                                <div className="h-full bg-blue-400 transition-[width] duration-300" style={{ width: `${progress.percent}%` }} />
+                              </div>
+                              <div className="text-[11px] text-blue-100/80">{progress.processedPages} / {progress.pageCount} صفحة</div>
+                            </>
+                          )}
+                          {isFailed && <div className="text-[11px] text-rose-100/80 leading-relaxed">{doc.processingError || 'راجع سجلات KnowledgeWorker لمعرفة سبب الفشل.'}</div>}
+                        </div>
+                      );
+                    })()}
 
                     {/* Action Buttons Bar */}
                     <div className="pt-3 border-t border-slate-800/70 flex items-center justify-between gap-2">
