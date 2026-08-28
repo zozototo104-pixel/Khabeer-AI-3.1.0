@@ -359,14 +359,28 @@ export class SpeechEngine {
       // diarization so enrollment and recognition see acoustically comparable
       // 2-second windows from the exact same neural model.
       const windows = selectSpeakerWindows(initialPcmOrEmbedding, 3);
-      const enrollmentEmbeddings = await Promise.all(
-        (windows.length ? windows : [initialPcmOrEmbedding]).map((window) => this.provider.extractEmbedding(window)),
-      );
-      const first = enrollmentEmbeddings[0];
-      const profile = registry.registerOrUpdateSpeaker(name, first, { embeddingModel: this.provider.getModelId() });
-      for (const sampleEmbedding of enrollmentEmbeddings.slice(1)) {
+      // Run enrollment sequentially. On small Render CPU instances, launching
+      // three ONNX requests concurrently queues them behind one worker and can
+      // make later requests hit the worker timeout even though inference is healthy.
+      const enrollmentEmbeddings: number[][] = [];
+      for (const window of windows.length ? windows : [initialPcmOrEmbedding]) {
+        try {
+          enrollmentEmbeddings.push(await this.provider.extractEmbedding(window));
+        } catch (error) {
+          console.warn(`[SpeechEngine][${sessionId}] Enrollment window rejected:`, error);
+        }
+      }
+      if (!enrollmentEmbeddings.length) {
+        throw new Error('SPEAKER_ENROLLMENT_NO_VALID_EMBEDDING');
+      }
+      // Register a single robust centroid first, then retain the individual
+      // samples as gallery exemplars for microphone/phonetic variation.
+      const consensus = buildConsensusEmbedding(enrollmentEmbeddings);
+      const profile = registry.registerOrUpdateSpeaker(name, consensus, { embeddingModel: this.provider.getModelId() });
+      for (const sampleEmbedding of enrollmentEmbeddings) {
         registry.updateSpeaker(profile.id, sampleEmbedding, 'HIGH', true);
       }
+      console.log(`[SpeechEngine][${sessionId}] Enrolled ${name} from ${enrollmentEmbeddings.length} verified voice windows.`);
       return profile;
     } else if (Array.isArray(initialPcmOrEmbedding)) {
       embedding = initialPcmOrEmbedding;
