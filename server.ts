@@ -854,6 +854,22 @@ async function drainKnowledgeProcessingQueue() {
           mimeType: job.mimeType || 'application/pdf',
         }, {
           ocrPdf: extractPdfWithVerifiedOcr,
+          onOcrProgress: async (progress) => {
+            await db.update(knowledge).set({
+              pageCount: progress.pageCount || null,
+              processedPages: Math.max(0, Math.min(progress.pageCount || 0, progress.processedPages || 0)),
+              processingStatus: 'PROCESSING',
+              processingError: null,
+              updatedAt: new Date(),
+            }).where(eq(knowledge.id, job.id));
+            console.log('[KnowledgeWorker:PROGRESS]', {
+              id: job.id,
+              fileName: job.fileName,
+              stage: progress.stage,
+              processedPages: progress.processedPages,
+              pageCount: progress.pageCount,
+            });
+          },
           persist: async (prepared) => {
             const pageMatches = prepared.content.match(/\[\[(?:الصفحة|PAGE)\s+\d+\]\]/gi);
             await db.update(knowledge).set({
