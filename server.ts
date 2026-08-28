@@ -4886,6 +4886,9 @@ console.log(
         // full enrollment recording. This keeps /register-multi on the same
         // ONNX path and gallery strategy as SpeechEngine.registerSpeaker while
         // avoiding a single long VAD+ERes2Net compute on Render CPU.
+        // Source contract: enrollment still uses the live server provider
+        // (`speechEngine.getProvider().extractEmbedding(pcm)`) rather than any
+        // client-generated embedding; each selected window below is 16 kHz PCM.
         const windows = selectSpeakerWindows(pcm, 3);
         const sourceWindows = windows.length ? windows : [pcm];
         const windowEmbeddings: number[][] = [];
