@@ -2122,12 +2122,8 @@ ${memoryContext}`;
               speakerConfidence: verifiedProfile.confidence,
               identitySource: 'VERIFIED',
             };
-            if (activeLiveSession && typeof activeLiveSession.sendRealtimeInput === "function") {
-              try {
-                activeLiveSession.sendRealtimeInput({
-                  text: `[بيانات وصفية للنظام - لا تجب عليها: المتحدث الموثق الحالي id=${verifiedProfile.id}; name=${verifiedProfile.name}]`,
-                });
-              } catch(e) {}
+            if (activeLiveSession) {
+              sendLiveContext(activeLiveSession, `[بيانات وصفية للنظام - لا تجب عليها: المتحدث الموثق الحالي id=${verifiedProfile.id}; name=${verifiedProfile.name}. استخدم هذه الهوية عند سؤال المستخدم "من أنا".]`);
             }
           } else if (clientWs.readyState === clientWs.OPEN) {
             clientWs.send(JSON.stringify({
