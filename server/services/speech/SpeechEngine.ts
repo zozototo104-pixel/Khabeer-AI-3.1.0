@@ -27,8 +27,8 @@ class ServerSpeakerEmbeddingProvider implements SpeakerEmbeddingProvider {
     this.service = speakerRecognitionService;
   }
 
-  async extractEmbedding(pcmData: Float32Array): Promise<number[]> {
-    return this.service.getEmbedding(pcmData);
+  async extractEmbedding(pcmData: Float32Array, options: { label?: string; bypassVad?: boolean } = {}): Promise<number[]> {
+    return this.service.getEmbedding(pcmData, options);
   }
 
   getName(): string {
