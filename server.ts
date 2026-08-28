@@ -3643,7 +3643,7 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
         ...result.persisted,
         fileName: originalName,
         mimeType: mimeType || 'application/octet-stream',
-        fileSize: req.file.buffer.length,
+        fileSize: fileBuffer.length,
         sha256,
         hasOriginalFile: true,
         extractionMethod: result.prepared.extractionMethod,
