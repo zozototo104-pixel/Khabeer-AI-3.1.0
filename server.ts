@@ -835,7 +835,7 @@ async function drainKnowledgeProcessingQueue() {
       await db.update(knowledge).set({
         processingStatus: 'PROCESSING',
         processingError: null,
-        processedPages: Math.max(0, Number(job.processingStatus === 'PROCESSING' ? 0 : 0)),
+        processedPages: 0,
         updatedAt: new Date(),
       }).where(eq(knowledge.id, job.id));
 
