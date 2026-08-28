@@ -17,6 +17,16 @@ RUN npm run lint \
   && npm run speaker:verify-model \
   && npm run build
 
+# Official NVIDIA NeMo-Speech.cpp CPU diarization runtime. The compiler and
+# conversion toolchain stay in this build stage, not in production.
+FROM node:22-bookworm-slim AS sortformer
+WORKDIR /app
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates git build-essential cmake ninja-build pkg-config libsentencepiece-dev python3 python3-venv python3-pip \
+  && rm -rf /var/lib/apt/lists/*
+COPY scripts/install-sortformer.sh ./scripts/install-sortformer.sh
+RUN sh ./scripts/install-sortformer.sh
+
 FROM node:22-bookworm-slim AS runtime
 
 ENV NODE_ENV=production \
