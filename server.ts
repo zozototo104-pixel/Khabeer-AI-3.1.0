@@ -804,7 +804,8 @@ async function drainKnowledgeProcessingQueue() {
   try {
     const { db } = await import('./src/db/index.ts');
     const { knowledge, knowledgeFiles } = await import('./src/db/schema.ts');
-    const { asc, eq, or } = await import('drizzle-orm');
+    const { and, asc, eq, lt, or } = await import('drizzle-orm');
+    const staleProcessingBefore = new Date(Date.now() - 20 * 60_000);
 
     while (true) {
       const jobs = await db.select({
