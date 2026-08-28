@@ -27,8 +27,19 @@ export type KnowledgeStage =
   | 'index_start'
   | 'index_done';
 
+export interface KnowledgeOcrProgress {
+  processedPages: number;
+  pageCount: number;
+  stage: 'plan' | 'page' | 'complete';
+}
+
 export interface KnowledgeIngestionDependencies<T> {
-  ocrPdf?: (buffer: Buffer, fileName: string, pageCount: number) => Promise<string>;
+  ocrPdf?: (
+    buffer: Buffer,
+    fileName: string,
+    pageCount: number,
+    onProgress?: (progress: KnowledgeOcrProgress) => void | Promise<void>,
+  ) => Promise<string>;
   persist: (document: PreparedKnowledgeDocument) => Promise<T>;
   onStage?: (stage: KnowledgeStage) => void;
 }
