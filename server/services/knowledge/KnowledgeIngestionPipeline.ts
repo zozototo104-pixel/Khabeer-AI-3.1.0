@@ -42,6 +42,7 @@ export interface KnowledgeIngestionDependencies<T> {
   ) => Promise<string>;
   persist: (document: PreparedKnowledgeDocument) => Promise<T>;
   onStage?: (stage: KnowledgeStage) => void;
+  onOcrProgress?: (progress: KnowledgeOcrProgress) => void | Promise<void>;
 }
 
 function logPdfStage(stage: string, fields: Record<string, unknown>): void {
