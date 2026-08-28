@@ -165,12 +165,17 @@ export class SpeakerDiarizer {
           .then(buildConsensusEmbedding),
         new Promise<number[]>((_, reject) => setTimeout(() => reject(new Error('EMBEDDING_TIMEOUT')), 5000))
       ]);
+      const hasRegisteredProfiles = this.registry.getAllSpeakers().some((profile) =>
+        !profile.isCandidate
+        && profile.status === 'VALID'
+        && (!profile.embeddingModel || profile.embeddingModel === this.provider.getModelId()),
+      );
       result = this.registry.identifySpeaker(embedding, {
         segmentId,
         latencyMs: Date.now() - startedAt,
         source: this.provider.getName().includes('Neural') ? 'DEEP_NEURAL' : 'ACOUSTIC_FALLBACK',
         embeddingModel: this.provider.getModelId(),
-        createCandidate: true,
+        createCandidate: !hasRegisteredProfiles,
         previousSpeakerId: this.currentSpeakerId,
       });
     } catch (error: any) {
