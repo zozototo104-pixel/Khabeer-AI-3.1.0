@@ -250,9 +250,10 @@ export class SpeechEngine {
       }))
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, 3);
-    const resultSimilarity = Number.isFinite(result.similarity) ? result.similarity.toFixed(4) : '0.0000';
-    console.log(`[SpeechEngine][${sessionId}] IDENT_DIAG result=${result.name || 'UNKNOWN'} similarity=${resultSimilarity} confidence=${result.confidence} status=${result.status} identitySource=${result.identitySource} candidates=${JSON.stringify(candidates)}`);
-    return result;
+    const corroborated = this.corroborateNearRegisteredMatch(result, sessionId) || result;
+    const resultSimilarity = Number.isFinite(corroborated.similarity) ? corroborated.similarity.toFixed(4) : '0.0000';
+    console.log(`[SpeechEngine][${sessionId}] IDENT_DIAG result=${corroborated.name || 'UNKNOWN'} similarity=${resultSimilarity} confidence=${corroborated.confidence} status=${corroborated.status} identitySource=${corroborated.identitySource} candidates=${JSON.stringify(candidates)}`);
+    return corroborated;
   }
 
   /**
