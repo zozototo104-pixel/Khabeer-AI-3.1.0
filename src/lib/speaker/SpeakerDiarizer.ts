@@ -40,6 +40,15 @@ export class SpeakerDiarizer {
     return this.totalBufferedSamples;
   }
 
+  /**
+   * Returns a defensive snapshot of the currently buffered speech turn.
+   * External diarization backends (for example Sortformer) can inspect the
+   * complete turn without mutating SpeakerDiarizer's internal buffer.
+   */
+  public getBufferedPcm(): Float32Array {
+    return this.concatenateBuffer();
+  }
+
   public retainRecentSamples(maxSamples: number): void {
     const limit = Math.max(0, Math.floor(maxSamples));
     while (this.totalBufferedSamples > limit && this.activeBuffer.length) {
