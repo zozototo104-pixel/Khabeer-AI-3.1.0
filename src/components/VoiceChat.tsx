@@ -1930,7 +1930,10 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
           // crest (typical TV/echo/compressed loudspeaker output) must persist
           // longer before we cut the expert off.
           const strongBargeIn = isAiPlaying && closeSpeechOnset && rms >= Math.max(0.150, echoRelativeThreshold * 1.25);
-          const requiredSpeechFrames = isAiPlaying ? (strongBargeIn ? 5 : 14) : 2;
+          // A single sharp TV/transient can look like near-field speech. Require
+          // a short sustained burst before cutting playback; real user barge-in
+          // still lands quickly, but isolated spikes no longer stop the expert.
+          const requiredSpeechFrames = isAiPlaying ? (strongBargeIn ? 8 : 16) : 2;
           const isCurrentlySpeaking = vadSpeechFramesRef.current >= requiredSpeechFrames;
           const speechThreshold = isAiPlaying
             ? (isCurrentlySpeaking ? stopThreshold : echoRelativeThreshold)
