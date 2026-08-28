@@ -4918,6 +4918,7 @@ console.log(
           continue;
         }
         extractedEmbeddings.push(consensus, ...windowEmbeddings);
+        acceptedAudioSamples += 1;
         console.log(`[Speaker:EnrollExtract] name=${name.trim()} sample=${i} windows=${sourceWindows.length} acceptedWindows=${windowEmbeddings.length} persistedEmbeddings=${windowEmbeddings.length + 1}`);
       }
 
