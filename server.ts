@@ -1161,14 +1161,8 @@ if (lastInjectedSpeakerId === diagResult.speakerId && lastInjectedSpeakerTurnId 
 lastInjectedSpeakerId = diagResult.speakerId;
 lastInjectedSpeakerTurnId = currentTurn;
 
-      if (activeLiveSession && typeof activeLiveSession.sendRealtimeInput === 'function') {
-        try {
-          activeLiveSession.sendRealtimeInput({
-            text: `[بيانات وصفية للنظام - لا تجب على هذه الرسالة: المتحدث الحالي الموثق صوتياً هو ${diagResult.name}. انسب المداخلة الجارية إليه.]`,
-          });
-        } catch (error) {
-          console.warn('Speaker context injection failed:', error);
-        }
+      if (activeLiveSession) {
+        sendLiveContext(activeLiveSession, `[بيانات وصفية للنظام - لا تجب على هذه الرسالة: المتحدث الحالي الموثق صوتياً هو ${diagResult.name} (id=${diagResult.speakerId}). عندما يسأل المستخدم "من أنا" أو يطلب نسبة الكلام، استخدم هذه الهوية الصوتية الموثقة للدور الجاري.]`);
       }
     };
 
