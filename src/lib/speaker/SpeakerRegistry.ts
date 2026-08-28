@@ -385,6 +385,9 @@ if (!isCandidate) {
     }
 
     if (options.createCandidate === false) return this.unknownResult(debugInfo, 'NO_VERIFIED_MATCH');
+    if (best && options.suppressCandidateIfNearRegistered && best.finalSimilarity >= options.suppressCandidateIfNearRegistered) {
+      return this.unknownResult(debugInfo, 'NEAR_REGISTERED_PENDING_CORROBORATION');
+    }
 
     // 2. Reuse Existing Candidate Cluster if similarity is reasonable
     const existingCandidates = [...this.profiles.values()].filter((p) => p.isCandidate && p.centroidEmbedding.length === embedding.length && (!options.embeddingModel || !p.embeddingModel || options.embeddingModel === p.embeddingModel));
