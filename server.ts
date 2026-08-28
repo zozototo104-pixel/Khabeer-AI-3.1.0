@@ -3549,7 +3549,7 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
 
       const originalName = req.file.originalname;
       const mimeType = req.file.mimetype;
-      const sha256 = createHash('sha256').update(req.file.buffer).digest('hex');
+      const sha256 = createHash('sha256').update(fileBuffer).digest('hex');
 
       // Large PDFs must not keep the browser upload request open while OCR runs.
       // Persist the immutable source first, return 202 immediately, then extract in background.
