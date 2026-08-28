@@ -3670,6 +3670,8 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
           ? 'قاعدة البيانات غير متاحة حاليًا. لم يتم حفظ سجل ناقص.'
           : 'تعذر حفظ المستند في قاعدة المعرفة. لم يتم تسجيل ملف ناقص.';
       return res.status(code === 'KNOWLEDGE_SCHEMA_OUTDATED' ? 503 : 500).json({ code, error: userMessage });
+    } finally {
+      await cleanupUploadedFile(req.file);
     }
   });
 
