@@ -166,10 +166,26 @@ export class SpeechEngine {
   public async detectSpeaker(pcmData: Float32Array, sessionId: string = 'global'): Promise<SpeakerIdentificationResult> {
     const embedding = await this.provider.extractEmbedding(pcmData, { label: `detect:${sessionId}` });
     const registry = this.getSessionRegistry(sessionId);
-    return registry.identifySpeaker(embedding, {
+    const result = registry.identifySpeaker(embedding, {
       source: this.provider.getName().includes('Neural') ? 'DEEP_NEURAL' : 'ACOUSTIC_FALLBACK',
       embeddingModel: this.provider.getModelId(),
     });
+    const modelId = this.provider.getModelId();
+    const candidates = registry.getAllSpeakers()
+      .filter((profile) => !profile.isCandidate && profile.embeddingModel === modelId)
+      .map((profile) => ({
+        id: profile.id,
+        name: profile.name,
+        samples: Array.isArray(profile.embeddings) ? profile.embeddings.length : 0,
+        similarity: Math.max(
+          profile.confidence || 0,
+          ...(Array.isArray(profile.embeddings) ? profile.embeddings.map((sample) => this.cosineSimilaritySafe(embedding, sample)) : []),
+        ),
+      }))
+      .sort((a, b) => b.similarity - a.similarity)
+      .slice(0, 3);
+    console.log(`[SpeechEngine][${sessionId}] IDENT_DIAG result=${result.speakerName || 'UNKNOWN'} confidence=${result.confidence.toFixed(4)} verified=${result.isVerified} candidates=${JSON.stringify(candidates)}`);
+    return result;
   }
 
   /**
