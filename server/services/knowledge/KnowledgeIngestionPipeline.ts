@@ -96,7 +96,7 @@ export async function prepareKnowledgeDocument(
       );
     }
     try {
-      const ocrText = await options.ocrPdf(source.buffer, source.fileName, native.pageCount);
+      const ocrText = await options.ocrPdf(source.buffer, source.fileName, native.pageCount, options.onOcrProgress);
       content = normalizeExtractedDocumentText(ocrText);
       quality = assessDocumentTextQuality(content, { pageCount: native.pageCount });
       extractionMethod = 'VERIFIED_OCR';
