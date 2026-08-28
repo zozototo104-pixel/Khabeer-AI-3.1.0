@@ -4881,13 +4881,43 @@ const enrollRms = Math.sqrt(
 console.log(
   `[Speaker:EnrollAudio] name=${name.trim()} sample=${i} duration=${enrollDurationSec.toFixed(3)}s samples=${pcm.length} rms=${enrollRms.toFixed(5)} peak=${enrollPeak.toFixed(5)}`
 );
-        // Extract embedding via ONNX Worker (same path as live recognition)
-        const emb = await speechEngine.getProvider().extractEmbedding(pcm);
-        if (!Array.isArray(emb) || emb.length !== 512) {
-          sampleErrors.push({ index: i, error: `EMBEDDING_DIM_INVALID (${Array.isArray(emb) ? emb.length : 0})` });
+        // Extract embeddings from short, high-quality windows instead of one
+        // full enrollment recording. This keeps /register-multi on the same
+        // ONNX path and gallery strategy as SpeechEngine.registerSpeaker while
+        // avoiding a single long VAD+ERes2Net compute on Render CPU.
+        const windows = selectSpeakerWindows(pcm, 3);
+        const sourceWindows = windows.length ? windows : [pcm];
+        const windowEmbeddings: number[][] = [];
+        for (let windowIndex = 0; windowIndex < sourceWindows.length; windowIndex++) {
+          const window = sourceWindows[windowIndex];
+          if (window.length < 16000) {
+            console.warn(`[Speaker:EnrollExtract] name=${name.trim()} sample=${i} window=${windowIndex} rejected=WINDOW_TOO_SHORT samples=${window.length}`);
+            continue;
+          }
+          try {
+            const emb = await speechEngine.getProvider().extractEmbedding(window, {
+              label: `register-multi:${scope}:${name.trim()}:sample${i}:window${windowIndex}`,
+            });
+            if (!Array.isArray(emb) || emb.length !== 512) {
+              sampleErrors.push({ index: i, error: `EMBEDDING_DIM_INVALID (${Array.isArray(emb) ? emb.length : 0})` });
+              continue;
+            }
+            windowEmbeddings.push(emb);
+          } catch (error: any) {
+            console.warn(`[Speaker:EnrollExtract] name=${name.trim()} sample=${i} window=${windowIndex} failed=${error?.message || error}`);
+          }
+        }
+        if (windowEmbeddings.length === 0) {
+          sampleErrors.push({ index: i, error: 'NO_VALID_ENROLLMENT_WINDOWS' });
           continue;
         }
-        extractedEmbeddings.push(emb);
+        const consensus = buildConsensusEmbedding(windowEmbeddings);
+        if (!Array.isArray(consensus) || consensus.length !== 512) {
+          sampleErrors.push({ index: i, error: `CONSENSUS_DIM_INVALID (${Array.isArray(consensus) ? consensus.length : 0})` });
+          continue;
+        }
+        extractedEmbeddings.push(consensus, ...windowEmbeddings);
+        console.log(`[Speaker:EnrollExtract] name=${name.trim()} sample=${i} windows=${sourceWindows.length} acceptedWindows=${windowEmbeddings.length} persistedEmbeddings=${windowEmbeddings.length + 1}`);
       }
 
       if (extractedEmbeddings.length === 0) {
