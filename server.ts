@@ -2162,6 +2162,11 @@ ${memoryContext}`;
           }
         } else if (msg.type === 'speech_start') {
           const sid = dbSessionId ? String(dbSessionId) : 'global';
+          if (pendingSpeechEndTimer) {
+            clearTimeout(pendingSpeechEndTimer);
+            pendingSpeechEndTimer = null;
+            console.log('[VoiceWS] Cancelled pending speech_end finalization because speech resumed', { sid, turn: currentTurn });
+          }
           lastSpeakerTask = null;
           pendingSelfIdentifiedName = '';
           activeSpeakerAttribution = {
