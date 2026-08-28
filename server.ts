@@ -3806,7 +3806,7 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
         }
         try {
           const prepared = await prepareKnowledgeDocument({
-            buffer: req.file.buffer,
+            buffer: replacementBuffer,
             fileName: originalName,
             mimeType: req.file.mimetype,
           }, { ocrPdf: extractPdfWithVerifiedOcr });
