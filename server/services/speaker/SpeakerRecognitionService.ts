@@ -364,6 +364,8 @@ export class SpeakerRecognitionService {
             const logLine = `[SpeakerRecognition] embedding ${message.type} id=${id} label=${pending.label} metrics=${JSON.stringify(metrics)}`;
             if (message.type === 'error' || pending.timedOut) console.warn(logLine);
             else console.log(logLine);
+            this.workerBusy = false;
+            this.dispatchNextEmbedding();
             if (pending.timedOut) return;
             if (message.type === 'result') {
               const embedding = Array.isArray(message.embedding) ? message.embedding : [];
