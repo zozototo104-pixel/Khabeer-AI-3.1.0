@@ -422,6 +422,78 @@ export class SpeakerRecognitionService {
     return this.workerReady;
   }
 
+  private dispatchNextEmbedding(): void {
+    if (this.workerBusy || !this.worker || this.embeddingQueue.length === 0) return;
+    const request = this.embeddingQueue.shift()!;
+    const startedAt = Date.now();
+    const timeoutMs = Math.max(5_000, Number(process.env.SPEAKER_WORKER_TIMEOUT_MS || 15_000));
+    this.workerBusy = true;
+
+    let pending: {
+      resolve: (value: number[]) => void;
+      reject: (error: Error) => void;
+      timer: NodeJS.Timeout;
+      cleanupTimer?: NodeJS.Timeout;
+      label: string;
+      queuedAt: number;
+      startedAt: number;
+      timeoutMs: number;
+      timedOut?: boolean;
+    };
+
+    const timeoutError = new Error('SPEAKER_WORKER_TIMEOUT');
+    const timer = setTimeout(() => {
+      pending.timedOut = true;
+      console.error(`[SpeakerRecognition] embedding timeout id=${request.id} label=${request.label} metrics=${JSON.stringify({
+        requestId: request.id,
+        label: request.label,
+        queueWaitMs: startedAt - request.queuedAt,
+        hostElapsedMs: Date.now() - request.queuedAt,
+        timeoutMs,
+        rawSamples: request.copy.length,
+      })}`);
+      pending.reject(timeoutError);
+      pending.cleanupTimer = setTimeout(() => {
+        const stillPending = this.pending.get(request.id);
+        if (stillPending === pending) {
+          this.pending.delete(request.id);
+          this.workerBusy = false;
+          console.error(`[SpeakerRecognition] embedding abandoned after timeout id=${request.id} label=${request.label}`);
+          this.dispatchNextEmbedding();
+        }
+      }, Math.max(60_000, timeoutMs * 4));
+    }, timeoutMs);
+
+    pending = {
+      resolve: request.resolve,
+      reject: request.reject,
+      timer,
+      label: request.label,
+      queuedAt: request.queuedAt,
+      startedAt,
+      timeoutMs,
+    };
+    this.pending.set(request.id, pending);
+
+    try {
+      this.worker.postMessage({
+        type: 'embed',
+        id: request.id,
+        buffer: request.copy.buffer,
+        bypassVad: request.bypassVad,
+        queuedAt: request.queuedAt,
+        startedAt,
+        label: request.label,
+      }, [request.copy.buffer]);
+    } catch (error: any) {
+      clearTimeout(timer);
+      this.pending.delete(request.id);
+      this.workerBusy = false;
+      request.reject(error instanceof Error ? error : new Error(String(error)));
+      this.dispatchNextEmbedding();
+    }
+  }
+
   public async checkHealth(): Promise<Record<string, unknown>> {
     const neuralAvailable = await this.ensureWorker();
     let sizeBytes = 0;
