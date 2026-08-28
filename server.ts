@@ -4996,7 +4996,8 @@ console.log(
           embeddingsCount: profile.embeddings.length,
           centroidDimension: profile.centroidEmbedding.length,
         },
-        acceptedSamples: extractedEmbeddings.length,
+        acceptedSamples: acceptedAudioSamples,
+        acceptedEmbeddings: extractedEmbeddings.length,
         rejectedSamples: sampleErrors.length,
         sampleErrors: sampleErrors.length > 0 ? sampleErrors : undefined,
       });
