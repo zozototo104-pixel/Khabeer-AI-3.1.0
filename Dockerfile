@@ -62,7 +62,8 @@ COPY --from=build --chown=node:node /app/models ./models
 COPY --from=build --chown=node:node /app/migrations ./migrations
 COPY --from=sortformer /opt/nemo /opt/nemo
 ENV NEMO_SPEECH_BIN=/opt/nemo/bin/nemo-speech \
-    SORTFORMER_MODEL=/opt/nemo/models/sortformer-v2.q8_0.gguf
+    SORTFORMER_MODEL=/opt/nemo/models/sortformer-v2.q8_0.gguf \
+    LD_LIBRARY_PATH=/opt/nemo/lib
 
 USER node
 EXPOSE 3000
