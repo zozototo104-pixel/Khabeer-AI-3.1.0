@@ -51,7 +51,7 @@ function logPdfStage(stage: string, fields: Record<string, unknown>): void {
 
 export async function prepareKnowledgeDocument(
   source: KnowledgeUploadSource,
-  options: Pick<KnowledgeIngestionDependencies<unknown>, 'ocrPdf' | 'onStage'> = {},
+  options: Pick<KnowledgeIngestionDependencies<unknown>, 'ocrPdf' | 'onStage' | 'onOcrProgress'> = {},
 ): Promise<PreparedKnowledgeDocument> {
   const isPdfUpload = source.fileName.toLowerCase().endsWith('.pdf');
   if (isPdfUpload) {
