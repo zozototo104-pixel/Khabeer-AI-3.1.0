@@ -1458,18 +1458,28 @@ lastInjectedSpeakerTurnId = currentTurn;
 
               if (org) {
                 try {
-                  const memoryContext = await Promise.race([
-                    memoryEngine.buildSystemPromptContext(uid, org.id),
-                    new Promise<string>((resolve) => setTimeout(() => resolve(''), 3500)),
+                  const [memoryContext, liveKnowledgeContext] = await Promise.all([
+                    Promise.race([
+                      memoryEngine.buildSystemPromptContext(uid, org.id),
+                      new Promise<string>((resolve) => setTimeout(() => resolve(''), 3500)),
+                    ]),
+                    Promise.race([
+                      ragEngine.buildLivePromptContext(org.id),
+                      new Promise<string>((resolve) => setTimeout(() => resolve(''), 3500)),
+                    ]),
                   ]);
                   if (memoryContext) dynamicContext += `
 
 ${memoryContext}`;
+                  if (liveKnowledgeContext) dynamicContext += `
+
+=== ملخص قاعدة المعرفة المؤسسية المتاحة لهذه الجلسة ===
+${liveKnowledgeContext}`;
                   dynamicContext += `
 
-قاعدة المعرفة المؤسسية متاحة عبر أدوات الاسترجاع. عند السؤال عن مادة أو بند أو لائحة استخدم lookup_regulation_article قبل الجزم.`;
+قاعدة المعرفة المؤسسية متاحة عبر أدوات الاسترجاع. عند السؤال عن مادة أو بند أو لائحة أو سؤال عام مثل "شو موجود باللائحة" استخدم lookup_regulation_article قبل الجزم، ثم أجب من النص المسترجع فقط.`;
                 } catch (contextError: any) {
-                  console.warn('Live memory context skipped:', contextError?.message || contextError);
+                  console.warn('Live memory/RAG context skipped:', contextError?.message || contextError);
                 }
               }
 
