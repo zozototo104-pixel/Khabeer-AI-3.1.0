@@ -20,14 +20,22 @@ cmake --build --preset cpu-diar -j2
 # binary makes the runtime fail with missing libnemo_speech_*.so dependencies.
 mkdir -p "$PREFIX/bin" "$PREFIX/lib"
 cp "build/cpu-diar/bin/nemo-speech" "$PREFIX/bin/nemo-speech"
-# Copy the complete dynamic-library closure. Some dependencies (notably ggml)
-# are represented by symlinks inside the build tree, so searching only regular
-# files misses SONAMEs such as libggml.so.0 and libggml-base.so.0.
-find "$SRC" \( -type f -o -type l \) \( -name '*.so' -o -name '*.so.*' \) -print | while IFS= read -r lib; do
-  resolved=$(readlink -f "$lib")
-  [ -f "$resolved" ] || continue
-  cp -L "$resolved" "$PREFIX/lib/$(basename "$resolved")"
-  ln -sf "$(basename "$resolved")" "$PREFIX/lib/$(basename "$lib")"
+# Copy real shared-library payloads first. Never scan PREFIX itself: creating
+# links while iterating a tree that includes the destination can turn a real
+# versioned library into a self-referential symlink (ELOOP).
+find "$SRC/build/cpu-diar" -type f \( -name '*.so' -o -name '*.so.*' \) -print | while IFS= read -r lib; do
+  cp -L "$lib" "$PREFIX/lib/$(basename "$lib")"
+done
+
+# Then preserve the SONAME aliases from the build tree. Resolve each link to a
+# real file and only create an alias when its name differs from the payload.
+find "$SRC/build/cpu-diar" -type l \( -name '*.so' -o -name '*.so.*' \) -print | while IFS= read -r lib; do
+  resolved=$(readlink -f "$lib" || true)
+  [ -n "$resolved" ] && [ -f "$resolved" ] || continue
+  target=$(basename "$resolved")
+  alias=$(basename "$lib")
+  [ -f "$PREFIX/lib/$target" ] || cp -L "$resolved" "$PREFIX/lib/$target"
+  [ "$alias" = "$target" ] || ln -sf "$target" "$PREFIX/lib/$alias"
 done
 chmod 0755 "$PREFIX/bin/nemo-speech"
 export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
