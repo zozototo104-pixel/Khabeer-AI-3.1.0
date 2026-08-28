@@ -2187,7 +2187,7 @@ ${memoryContext}`;
           pendingSpeechEndTimer = setTimeout(() => {
             pendingSpeechEndTimer = null;
             try {
-              console.log('[VoiceWS] Finalizing debounced speech_end', { sid, turn: currentTurn });
+              console.log('[VoiceWS] Finalizing debounced speech_end', { sid, turn: liveTurnSequence });
               lastSpeakerTask = speechEngine.processAudioChunk('', sid, true)
               .then(async (diagResult) => {
                 if (!diagResult) return null;
