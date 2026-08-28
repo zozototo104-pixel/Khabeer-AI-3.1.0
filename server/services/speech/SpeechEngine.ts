@@ -97,6 +97,7 @@ export class SpeechEngine {
     return output;
   }
   private liveEvidence: Map<string, { speakerId: string; hits: number; scoreSum: number; lastAt: number }> = new Map();
+  private nearRegisteredEvidence: Map<string, { speakerId: string; name: string; hits: number; scoreSum: number; lastAt: number }> = new Map();
 
   constructor() {
     this.globalRegistry = new SpeakerRegistry();
