@@ -1906,8 +1906,13 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
           // near-field human voice to break through immediately.
           const warmupBreakthroughThreshold = Math.max(0.180, echoRelativeThreshold * 1.35);
           const playbackWarmupHoldoff = isAiPlaying && aiPlaybackAgeMs < 350 && rms < warmupBreakthroughThreshold;
-          const strongBargeIn = isAiPlaying && !playbackWarmupHoldoff && rms >= Math.max(0.120, echoRelativeThreshold * 1.18);
-          const requiredSpeechFrames = isAiPlaying ? (strongBargeIn ? 5 : 10) : 2;
+          const ambientBaseline = Math.max(ambientRmsRef.current, noiseFloorRef.current * 2, 0.008);
+          const nearFieldRms = rms >= Math.max(0.055, ambientBaseline * 2.2);
+          const nearFieldPeak = peak >= Math.max(0.18, ambientBaseline * 6.0);
+          const nearFieldImpulse = crestFactor >= 3.0;
+          const nearFieldVoice = !playbackWarmupHoldoff && (nearFieldRms || (nearFieldPeak && nearFieldImpulse));
+          const strongBargeIn = isAiPlaying && nearFieldVoice && rms >= Math.max(0.120, echoRelativeThreshold * 1.18);
+          const requiredSpeechFrames = isAiPlaying ? (strongBargeIn ? 5 : 12) : 2;
           const isCurrentlySpeaking = vadSpeechFramesRef.current >= requiredSpeechFrames;
           const speechThreshold = isAiPlaying
             ? (isCurrentlySpeaking ? stopThreshold : echoRelativeThreshold)
