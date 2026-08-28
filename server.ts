@@ -408,6 +408,7 @@ async function extractPdfWithVerifiedOcr(
       directTextPages: usablePages,
       pagesNeedingOcr: pagesNeedingOcr.length,
     });
+    await onProgress?.({ processedPages: usablePages, pageCount, stage: 'plan' });
 
     let nextOcrIndex = 0;
 
