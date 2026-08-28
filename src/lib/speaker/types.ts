@@ -83,7 +83,7 @@ export interface SpeechSegment {
 }
 
 export interface SpeakerEmbeddingProvider {
-  extractEmbedding(pcmData: Float32Array): Promise<number[]>;
+  extractEmbedding(pcmData: Float32Array, options?: { label?: string; bypassVad?: boolean }): Promise<number[]>;
   getName(): string;
   getDimension(): number;
   getModelId(): string;
