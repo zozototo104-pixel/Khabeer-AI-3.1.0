@@ -15,6 +15,12 @@ import {
 } from '../speaker/SpeakerRecognitionService.ts';
 import { sortformerDiarizationService } from '../speaker/SortformerDiarizationService.ts';
 
+// sherpa-onnx's speaker-identification examples use manager.search({ threshold: 0.5 })
+// and recommend addMulti() for multi-utterance enrollment. Keep the global
+// application thresholds unchanged, but use this official floor only as a
+// corroboration gate across multiple live segments for already-registered speakers.
+const SHERPA_OFFICIAL_SEARCH_FLOOR = 0.50;
+
 /**
  * Server-side Speaker Embedding Provider
  * Bridges the SpeakerDiarizer with the ONNX-based SpeakerRecognitionService
