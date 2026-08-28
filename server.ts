@@ -3798,6 +3798,7 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
 
       // Replace content via new file upload
       if (req.file) {
+        replacementBuffer = await readUploadedFileBuffer(req.file);
         const originalName = normalizeUploadedFileName(req.file.originalname, req.body?.originalName);
         const supported = isSupportedKnowledgeFile(originalName);
         if (!supported) {
