@@ -172,6 +172,39 @@ function sendLiveText(session: any, text: string): void {
   }
 }
 
+function sendLiveContext(session: any, text: string): void {
+  const value = String(text || '').trim();
+  if (!session || !value) return;
+
+  // Gemini Live ordering guarantee applies to clientContent, not realtimeInput.
+  // Use turnComplete:false so metadata is committed to context without asking
+  // the model to answer the metadata as a standalone user message.
+  if (typeof session.sendClientContent === 'function') {
+    try {
+      session.sendClientContent({
+        turns: [{ role: 'user', parts: [{ text: value }] }],
+        turnComplete: false,
+      });
+      return;
+    } catch (error) {
+      console.warn('Gemini Live speaker-context sendClientContent failed:', error);
+    }
+  }
+
+  if (typeof session.send === 'function') {
+    try {
+      session.send({
+        clientContent: {
+          turns: [{ role: 'user', parts: [{ text: value }] }],
+          turnComplete: false,
+        },
+      });
+    } catch (error) {
+      console.warn('Gemini Live speaker-context clientContent failed:', error);
+    }
+  }
+}
+
 // Centralized resilient model caller. Once a model succeeds it is tried first
 // for the same fallback set, avoiding repeated slow failures on every request.
 async function callGeminiWithResilience(
