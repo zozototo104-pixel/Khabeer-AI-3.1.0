@@ -20,16 +20,14 @@ cmake --build --preset cpu-diar -j2
 # binary makes the runtime fail with missing libnemo_speech_*.so dependencies.
 mkdir -p "$PREFIX/bin" "$PREFIX/lib"
 cp "build/cpu-diar/bin/nemo-speech" "$PREFIX/bin/nemo-speech"
-# Do not restrict the dependency scan to build/cpu-diar: ggml and other
-# transitive libraries may be emitted by submodule build trees outside that
-# directory. Copy the complete shared-library closure produced by this build,
-# including versioned files such as libggml.so.0, and recreate SONAME symlinks.
-find "$SRC" -type f \( -name '*.so' -o -name '*.so.*' \) -exec cp -L {} "$PREFIX/lib/" \;
-for lib in "$PREFIX"/lib/*.so.*; do
-  [ -e "$lib" ] || continue
-  base=$(basename "$lib")
-  stem=${base%%.so.*}.so
-  ln -sf "$base" "$PREFIX/lib/$stem"
+# Copy the complete dynamic-library closure. Some dependencies (notably ggml)
+# are represented by symlinks inside the build tree, so searching only regular
+# files misses SONAMEs such as libggml.so.0 and libggml-base.so.0.
+find "$SRC" \( -type f -o -type l \) \( -name '*.so' -o -name '*.so.*' \) -print | while IFS= read -r lib; do
+  resolved=$(readlink -f "$lib")
+  [ -f "$resolved" ] || continue
+  cp -L "$resolved" "$PREFIX/lib/$(basename "$resolved")"
+  ln -sf "$(basename "$resolved")" "$PREFIX/lib/$(basename "$lib")"
 done
 chmod 0755 "$PREFIX/bin/nemo-speech"
 export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
