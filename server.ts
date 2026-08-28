@@ -245,6 +245,7 @@ async function extractPdfWithVerifiedOcr(
   pdfBuffer: Buffer,
   fileName: string,
   totalPages: number,
+  onProgress?: (progress: { processedPages: number; pageCount: number; stage: 'plan' | 'page' | 'complete' }) => void | Promise<void>,
 ): Promise<string> {
   const maximumPages = 200;
   // OCR now runs in the durable background worker, so a fixed 6-minute wall
