@@ -39,7 +39,7 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates libgomp1 libgl1 libglib2.0-0 poppler-utils tesseract-ocr tesseract-ocr-ara tesseract-ocr-eng python3 python3-venv python3-pip \
+  && apt-get install -y --no-install-recommends ca-certificates libgomp1 libgl1 libglib2.0-0 libsentencepiece0 poppler-utils tesseract-ocr tesseract-ocr-ara tesseract-ocr-eng python3 python3-venv python3-pip \
   && rm -rf /var/lib/apt/lists/*
 
 # Docling provides production-grade PDF layout/reading-order reconstruction.
