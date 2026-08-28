@@ -81,6 +81,16 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
     }
   }, [propToken, selectedOrgId]);
 
+  useEffect(() => {
+    if (!selectedOrgId) return;
+    const hasProcessingDocs = documents.some((doc) => doc.processingStatus === 'PENDING' || doc.processingStatus === 'PROCESSING');
+    if (!hasProcessingDocs) return;
+    const timer = window.setInterval(() => {
+      void fetchDocuments();
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [documents, selectedOrgId, propToken]);
+
   const fetchDocuments = async () => {
     setIsLoading(true);
     try {
