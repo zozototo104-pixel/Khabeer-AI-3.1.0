@@ -3828,16 +3828,16 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
 
       await db.transaction(async (tx: any) => {
         await tx.update(knowledge).set(updates).where(eq(knowledge.id, docId));
-        if (req.file) {
+        if (req.file && replacementBuffer) {
           const fileName = normalizeUploadedFileName(req.file.originalname, req.body?.originalName);
-          const sha256 = createHash('sha256').update(req.file.buffer).digest('hex');
+          const sha256 = createHash('sha256').update(replacementBuffer).digest('hex');
           await tx.insert(knowledgeFiles).values({
             knowledgeId: docId,
             fileName,
             mimeType: req.file.mimetype || 'application/octet-stream',
-            fileSize: req.file.buffer.length,
+            fileSize: replacementBuffer.length,
             sha256,
-            data: req.file.buffer,
+            data: replacementBuffer,
           }).onConflictDoUpdate({
             target: knowledgeFiles.knowledgeId,
             set: {
