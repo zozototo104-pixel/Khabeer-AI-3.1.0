@@ -2182,9 +2182,13 @@ ${memoryContext}`;
           }
           speechEngine.beginSpeechSegment(sid);
         } else if (msg.type === 'speech_end') {
-          try {
-            const sid = dbSessionId ? String(dbSessionId) : 'global';
-            lastSpeakerTask = speechEngine.processAudioChunk('', sid, true)
+          const sid = dbSessionId ? String(dbSessionId) : 'global';
+          if (pendingSpeechEndTimer) clearTimeout(pendingSpeechEndTimer);
+          pendingSpeechEndTimer = setTimeout(() => {
+            pendingSpeechEndTimer = null;
+            try {
+              console.log('[VoiceWS] Finalizing debounced speech_end', { sid, turn: currentTurn });
+              lastSpeakerTask = speechEngine.processAudioChunk('', sid, true)
               .then(async (diagResult) => {
                 if (!diagResult) return null;
                 await publishSpeakerResult(diagResult, Boolean(msg.isCalibration), 'FINAL');
