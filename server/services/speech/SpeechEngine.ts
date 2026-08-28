@@ -314,6 +314,13 @@ export class SpeechEngine {
           ? corroboratedProbe
           : this.stabilizeLiveProbe(corroboratedProbe, sessionId);
         if (stableLive) {
+          if (stableLive.identitySource === 'VERIFIED') {
+            this.recentVerifiedProbe.set(sessionId, {
+              serial: this.speechSerial.get(sessionId) || 0,
+              at: Date.now(),
+              result: stableLive,
+            });
+          }
           return {
             speakerId: stableLive.speakerId,
             name: stableLive.name,
