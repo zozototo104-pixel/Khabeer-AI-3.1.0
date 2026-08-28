@@ -15,12 +15,14 @@ git clone --depth 1 --recurse-submodules https://github.com/NVIDIA/NeMo-Speech.c
 cd "$SRC"
 scripts/configure.sh cpu-diar
 cmake --build --preset cpu-diar -j2
-# Component presets write the unified CLI to build/<preset>/bin. Copy the
-# minimal runtime explicitly because component builds do not guarantee an
-# install target/layout across releases.
-mkdir -p "$PREFIX/bin"
+# Component presets build a dynamically-linked unified CLI. Preserve both the
+# executable and every shared library produced by the preset; copying only the
+# binary makes the runtime fail with missing libnemo_speech_*.so dependencies.
+mkdir -p "$PREFIX/bin" "$PREFIX/lib"
 cp "build/cpu-diar/bin/nemo-speech" "$PREFIX/bin/nemo-speech"
+find "build/cpu-diar" -type f \( -name '*.so' -o -name '*.so.*' \) -exec cp -L {} "$PREFIX/lib/" \;
 chmod 0755 "$PREFIX/bin/nemo-speech"
+export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 # NVIDIA's official converter is the supported path from the public NeMo
 # Sortformer checkpoint to the GGUF consumed by NeMo-Speech.cpp.
