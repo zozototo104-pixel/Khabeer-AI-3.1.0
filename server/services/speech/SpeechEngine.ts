@@ -363,12 +363,14 @@ export class SpeechEngine {
       // three ONNX requests concurrently queues them behind one worker and can
       // make later requests hit the worker timeout even though inference is healthy.
       const enrollmentEmbeddings: number[][] = [];
+      let windowIndex = 0;
       for (const window of windows.length ? windows : [initialPcmOrEmbedding]) {
         try {
-          enrollmentEmbeddings.push(await this.provider.extractEmbedding(window));
+          enrollmentEmbeddings.push(await this.provider.extractEmbedding(window, { label: `enroll:${sessionId}:${name}:${windowIndex}` }));
         } catch (error) {
-          console.warn(`[SpeechEngine][${sessionId}] Enrollment window rejected:`, error);
+          console.warn(`[SpeechEngine][${sessionId}] Enrollment window ${windowIndex} rejected:`, error);
         }
+        windowIndex += 1;
       }
       if (!enrollmentEmbeddings.length) {
         throw new Error('SPEAKER_ENROLLMENT_NO_VALID_EMBEDDING');
