@@ -84,6 +84,18 @@ export class SpeechEngine {
     const denom = Math.sqrt(normA) * Math.sqrt(normB);
     return denom > 1e-12 ? dot / denom : 0;
   }
+
+  private concatenatePcm(chunks: Float32Array[]): Float32Array {
+    const total = chunks.reduce((sum, chunk) => sum + (chunk?.length || 0), 0);
+    const output = new Float32Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      if (!chunk?.length) continue;
+      output.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return output;
+  }
   private liveEvidence: Map<string, { speakerId: string; hits: number; scoreSum: number; lastAt: number }> = new Map();
 
   constructor() {
