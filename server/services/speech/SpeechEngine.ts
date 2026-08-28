@@ -13,6 +13,7 @@ import {
   speakerRecognitionService,
   type SpeakerRecognitionService,
 } from '../speaker/SpeakerRecognitionService.ts';
+import { sortformerDiarizationService } from '../speaker/SortformerDiarizationService.ts';
 
 /**
  * Server-side Speaker Embedding Provider
