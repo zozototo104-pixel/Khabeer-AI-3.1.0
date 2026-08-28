@@ -379,7 +379,8 @@ export class SpeechEngine {
             const rawResult = registry.identifySpeaker(consensus.consensus, {
               source: 'DEEP_NEURAL',
               embeddingModel: this.provider.getModelId(),
-              createCandidate,
+              createCandidate: true,
+              suppressCandidateIfNearRegistered: nearRegisteredSuppression,
             });
             const result = this.corroborateNearRegisteredMatch(rawResult, sessionId) || rawResult;
             trackDiagnostics.push({
