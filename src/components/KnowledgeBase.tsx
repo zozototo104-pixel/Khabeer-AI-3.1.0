@@ -374,6 +374,17 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
     }
   };
 
+  const getProcessingProgress = (doc: KnowledgeDoc) => {
+    const pageCount = Math.max(0, Number(doc.pageCount || 0));
+    const processedPages = Math.max(0, Number(doc.processedPages || 0));
+    if (!pageCount) return { processedPages, pageCount, percent: doc.processingStatus === 'COMPLETE' ? 100 : 0 };
+    return {
+      processedPages: Math.min(processedPages, pageCount),
+      pageCount,
+      percent: Math.max(0, Math.min(100, Math.round((processedPages / pageCount) * 100))),
+    };
+  };
+
   const filteredDocs = documents.filter(doc => {
     if (!searchQuery.trim()) return true;
     const query = searchQuery.toLowerCase();
