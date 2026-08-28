@@ -427,6 +427,24 @@ export class SpeechEngine {
         }
         if (!segment) segment = await diarizer.finalizeSegment();
         if (segment) {
+          const registry = this.getSessionRegistry(sessionId);
+          const finalCheck = registry.identifySpeaker(segment.embedding, {
+            segmentId: segment.id,
+            source: this.provider.getName().includes('Neural') ? 'DEEP_NEURAL' : 'ACOUSTIC_FALLBACK',
+            embeddingModel: this.provider.getModelId(),
+            createCandidate: false,
+          });
+          const corroborated = this.corroborateNearRegisteredMatch(finalCheck, sessionId) || (finalCheck.identitySource === 'VERIFIED' ? finalCheck : null);
+          if (corroborated) {
+            segment = {
+              ...segment,
+              speakerId: corroborated.speakerId || 'speaker_unknown',
+              speakerName: corroborated.name,
+              confidence: corroborated.confidence,
+              similarity: corroborated.similarity,
+              identitySource: corroborated.identitySource,
+            };
+          }
           return {
             speakerId: segment.speakerId === 'speaker_unknown' ? null : segment.speakerId,
             name: segment.speakerName,
@@ -437,6 +455,11 @@ export class SpeechEngine {
             debugInfo: {
               segmentId: segment.id,
               embeddingDimension: segment.embedding.length,
+              decisionReason: corroborated?.debugInfo?.decisionReason,
+              bestSpeakerId: finalCheck.debugInfo?.bestSpeakerId,
+              bestSpeakerName: finalCheck.debugInfo?.bestSpeakerName,
+              bestSimilarity: finalCheck.similarity,
+              margin: finalCheck.debugInfo?.margin,
             },
             segment
           };
