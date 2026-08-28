@@ -3555,8 +3555,8 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
       // Persist the immutable source first, return 202 immediately, then extract in background.
       const isPdf = mimeType === 'application/pdf' || /\.pdf$/i.test(originalName);
       const asyncPdfThreshold = Math.max(256 * 1024, Number(process.env.KNOWLEDGE_ASYNC_PDF_BYTES || 1024 * 1024));
-      if (isPdf && req.file.buffer.length >= asyncPdfThreshold) {
-        const sourceBuffer = Buffer.from(req.file.buffer);
+      if (isPdf && fileBuffer.length >= asyncPdfThreshold) {
+        const sourceBuffer = Buffer.from(fileBuffer);
         const { db } = await import('./src/db/index.ts');
         const { knowledge, knowledgeFiles } = await import('./src/db/schema.ts');
         const { eq } = await import('drizzle-orm');
