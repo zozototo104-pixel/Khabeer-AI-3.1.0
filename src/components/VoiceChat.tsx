@@ -1208,6 +1208,10 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
         nextStartTimeRef.current += buffer.duration;
         sourcesRef.current.push(source);
 
+        if (sourcesRef.current.length === 1) {
+          aiPlaybackStartedAtRef.current = Date.now();
+          echoGuardPeakRmsRef.current = 0;
+        }
         setIsSpeaking(true);
         setConversationState('AI_SPEAKING');
 
