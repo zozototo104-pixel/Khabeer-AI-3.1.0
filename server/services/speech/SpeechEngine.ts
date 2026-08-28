@@ -184,9 +184,8 @@ export class SpeechEngine {
       }))
       .sort((a, b) => b.similarity - a.similarity)
       .slice(0, 3);
-    const resultProfile = result.matchedProfile;
     const resultSimilarity = Number.isFinite(result.similarity) ? result.similarity.toFixed(4) : '0.0000';
-    console.log(`[SpeechEngine][${sessionId}] IDENT_DIAG result=${resultProfile?.name || 'UNKNOWN'} similarity=${resultSimilarity} confidence=${result.confidence} verified=${result.verified} candidates=${JSON.stringify(candidates)}`);
+    console.log(`[SpeechEngine][${sessionId}] IDENT_DIAG result=${result.name || 'UNKNOWN'} similarity=${resultSimilarity} confidence=${result.confidence} status=${result.status} identitySource=${result.identitySource} candidates=${JSON.stringify(candidates)}`);
     return result;
   }
 
