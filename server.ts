@@ -2547,11 +2547,11 @@ ${memoryContext}`;
       let extractedText = "";
       
       try {
-        extractedText = (await extractNativeDocumentText(req.file.buffer, originalName, mimeType)).text;
+        extractedText = (await extractNativeDocumentText(fileBuffer, originalName, mimeType)).text;
       } catch (parseError) {
         console.error("Local parsing failed", parseError);
         extractedText = originalName.endsWith('.txt') || originalName.endsWith('.md') || originalName.endsWith('.json')
-          ? req.file.buffer.toString('utf8')
+          ? fileBuffer.toString('utf8')
           : '';
       }
 
