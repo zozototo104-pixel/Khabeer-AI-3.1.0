@@ -2159,6 +2159,11 @@ ${memoryContext}`;
             speakerConfidence: 0,
             identitySource: 'UNKNOWN',
           };
+          lastInjectedSpeakerId = '';
+          lastInjectedSpeakerTurnId = -1;
+          if (activeLiveSession) {
+            sendLiveContext(activeLiveSession, `[بيانات وصفية للنظام - بداية مقطع صوتي جديد: لا تستخدم أي هوية صوتية من دور سابق. هوية المتحدث الحالي غير مؤكدة حتى تصل نتيجة VERIFIED جديدة لهذا المقطع.]`);
+          }
           speechEngine.beginSpeechSegment(sid);
         } else if (msg.type === 'speech_end') {
           try {
