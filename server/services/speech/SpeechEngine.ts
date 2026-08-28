@@ -279,35 +279,89 @@ export class SpeechEngine {
           const turnPcm = diarizer.getBufferedPcm();
           const regions = await sortformerDiarizationService.diarize(turnPcm);
           const registry = this.getSessionRegistry(sessionId);
-          let best: { region: (typeof regions)[number]; embedding: number[]; result: ReturnType<SpeakerRegistry['identifySpeaker']> } | null = null;
+          const tracks = new Map<string, Float32Array[]>();
           for (const region of regions) {
-            const windows = selectSpeakerWindows(region.pcm, 2);
-            for (const window of windows.length ? windows : [region.pcm]) {
+            if (!region.pcm?.length) continue;
+            if (!tracks.has(region.speaker)) tracks.set(region.speaker, []);
+            tracks.get(region.speaker)!.push(region.pcm);
+          }
+
+          let best: {
+            speaker: string;
+            pcm: Float32Array;
+            embedding: number[];
+            result: ReturnType<SpeakerRegistry['identifySpeaker']>;
+            windows: number;
+            acceptedEmbeddings: number;
+            rejectedEmbeddings: number;
+          } | null = null;
+          const trackDiagnostics: Array<Record<string, unknown>> = [];
+
+          for (const [speaker, parts] of tracks.entries()) {
+            const trackPcm = this.concatenatePcm(parts);
+            const windows = selectSpeakerWindows(trackPcm, 5);
+            const candidateWindows = windows.length ? windows : [trackPcm];
+            const embeddings: number[][] = [];
+            for (let windowIndex = 0; windowIndex < candidateWindows.length; windowIndex++) {
+              const window = candidateWindows[windowIndex];
               if (window.length < SPEAKER_THRESHOLDS.SAMPLE_RATE) continue;
-              const embedding = await this.provider.extractEmbedding(window, { label: `sortformer:${sessionId}:${region.speaker}` });
-              const result = registry.identifySpeaker(embedding, {
-                source: 'DEEP_NEURAL',
-                embeddingModel: this.provider.getModelId(),
-              });
-              if (!best || result.similarity > best.result.similarity) best = { region, embedding, result };
-              if (result.identitySource === 'VERIFIED') break;
+              try {
+                embeddings.push(await this.provider.extractEmbedding(window, { label: `sortformer-track:${sessionId}:${speaker}:w${windowIndex}` }));
+              } catch (error) {
+                console.warn(`[Sortformer] embedding failed session=${sessionId} speaker=${speaker} window=${windowIndex}:`, error);
+              }
+            }
+            const consensus = buildConsensusEmbeddingResult(embeddings);
+            if (!Array.isArray(consensus.consensus) || consensus.consensus.length !== 512) {
+              trackDiagnostics.push({ speaker, samples: trackPcm.length, windows: candidateWindows.length, accepted: 0, rejected: embeddings.length, identity: 'NO_VALID_EMBEDDING' });
+              continue;
+            }
+            const result = registry.identifySpeaker(consensus.consensus, {
+              source: 'DEEP_NEURAL',
+              embeddingModel: this.provider.getModelId(),
+            });
+            trackDiagnostics.push({
+              speaker,
+              samples: trackPcm.length,
+              seconds: Number((trackPcm.length / SPEAKER_THRESHOLDS.SAMPLE_RATE).toFixed(2)),
+              windows: candidateWindows.length,
+              accepted: consensus.acceptedEmbeddings.length,
+              rejected: consensus.rejectedCount,
+              identity: result.name,
+              source: result.identitySource,
+              similarity: Number(result.similarity.toFixed(4)),
+            });
+            if (!best || result.similarity > best.result.similarity) {
+              best = {
+                speaker,
+                pcm: trackPcm,
+                embedding: consensus.consensus,
+                result,
+                windows: candidateWindows.length,
+                acceptedEmbeddings: consensus.acceptedEmbeddings.length,
+                rejectedEmbeddings: consensus.rejectedCount,
+              };
             }
           }
-          if (best) {
+
+          console.log(`[Sortformer] session=${sessionId} speakers=${tracks.size} regions=${regions.length} tracks=${JSON.stringify(trackDiagnostics)}`);
+          if (best && best.result.identitySource !== 'UNKNOWN') {
             segment = {
               id: Date.now(),
-              startTime: Date.now() - Math.round((best.region.endSec - best.region.startSec) * 1000),
+              startTime: Date.now() - Math.round((best.pcm.length / SPEAKER_THRESHOLDS.SAMPLE_RATE) * 1000),
               endTime: Date.now(),
-              durationMs: Math.round((best.region.endSec - best.region.startSec) * 1000),
+              durationMs: Math.round((best.pcm.length / SPEAKER_THRESHOLDS.SAMPLE_RATE) * 1000),
               speakerId: best.result.speakerId || 'speaker_unknown',
               speakerName: best.result.name,
               confidence: best.result.confidence,
               similarity: best.result.similarity,
               identitySource: best.result.identitySource,
-              pcmData: best.region.pcm,
+              pcmData: best.pcm,
               embedding: best.embedding,
             };
-            console.log(`[Sortformer] session=${sessionId} speakers=${new Set(regions.map((r) => r.speaker)).size} regions=${regions.length} selected=${best.region.speaker} identity=${best.result.name} similarity=${best.result.similarity.toFixed(3)}`);
+            console.log(`[Sortformer] session=${sessionId} selected=${best.speaker} identity=${best.result.name} source=${best.result.identitySource} similarity=${best.result.similarity.toFixed(3)} windows=${best.windows} accepted=${best.acceptedEmbeddings} rejected=${best.rejectedEmbeddings}`);
+          } else if (best) {
+            console.warn(`[Sortformer] session=${sessionId} best track remained UNKNOWN similarity=${best.result.similarity.toFixed(3)}; falling back to full-turn legacy finalization.`);
           }
         } catch (error) {
           console.warn('[Sortformer] Native diarization failed; falling back to legacy diarizer:', error);
