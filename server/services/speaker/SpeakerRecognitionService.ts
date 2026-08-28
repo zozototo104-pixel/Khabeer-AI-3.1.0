@@ -394,6 +394,15 @@ export class SpeakerRecognitionService {
 
         worker.on('exit', (code) => {
           if (this.worker === worker) this.worker = null;
+          this.workerBusy = false;
+          const exitError = new Error(`SPEAKER_WORKER_EXIT_${code}`);
+          for (const [, pending] of this.pending) {
+            clearTimeout(pending.timer);
+            if (pending.cleanupTimer) clearTimeout(pending.cleanupTimer);
+            pending.reject(exitError);
+          }
+          this.pending.clear();
+          for (const queued of this.embeddingQueue.splice(0)) queued.reject(exitError);
           if (code !== 0) {
             this.neuralAvailable = false;
             this.loadError = `SPEAKER_WORKER_EXIT_${code}`;
