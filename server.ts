@@ -1109,6 +1109,33 @@ let lastInjectedSpeakerTurnId = -1;
       let action = 'RETAINED';
       let reason = 'NO_CHANGE';
 
+      // sherpa-onnx's reference speaker-identification example searches with a
+      // 0.5 threshold. A final UNKNOWN below that floor, with no candidate, is
+      // not useful meeting attribution; it is usually ambient TV/room audio or a
+      // very short VAD fragment. Do not let it overwrite a verified speaker or
+      // pollute the UI/context as a real participant.
+      const ambientUnknownFinal = phase === 'FINAL'
+        && (diagResult.identitySource || 'UNKNOWN') === 'UNKNOWN'
+        && diagResult.isNewCandidate !== true
+        && rawSimilarity >= 0
+        && rawSimilarity < 0.50;
+      if (ambientUnknownFinal) {
+        console.log(`[SPEAKER_AMBIENT_IGNORED] turnId=${currentTurn} segmentId=${diagResult.debugInfo?.segmentId || '?'} similarity=${rawSimilarity.toFixed(4)} reason=LOW_UNKNOWN_BELOW_SHERPA_FLOOR effectiveIdentity=${activeSpeakerAttribution.speakerName} effectiveSource=${activeSpeakerAttribution.identitySource}`);
+        if (clientWs.readyState === clientWs.OPEN) {
+          clientWs.send(JSON.stringify({
+            type: 'speaker_ambient_ignored',
+            phase,
+            similarity: rawSimilarity,
+            reason: 'LOW_UNKNOWN_BELOW_SHERPA_FLOOR',
+            debugInfo: {
+              ...diagResult.debugInfo,
+              turnId: currentTurn,
+            },
+          }));
+        }
+        return;
+      }
+
       if (diagResult.identitySource === 'VERIFIED') {
         activeSpeakerAttribution = {
           speakerId: diagResult.speakerId || null,
