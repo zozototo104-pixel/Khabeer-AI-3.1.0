@@ -40,8 +40,8 @@ export class SortformerDiarizationService {
     const rttm = path.join(dir, 'speech.rttm');
     try {
       await writeFile(wav, pcm16Wav(pcm));
-      await execFileAsync(this.binary, ['diarize', wav, '--model', this.model, '--format', 'rttm', '--output', rttm, '--device', 'cpu'], {
-        timeout: 15_000,
+      await execFileAsync(this.binary, ['diarize', wav, '--model', this.model, '--format', 'rttm', '--output', rttm], {
+        timeout: 30_000,
         maxBuffer: 1024 * 1024,
       });
       const text = await readFile(rttm, 'utf8');
