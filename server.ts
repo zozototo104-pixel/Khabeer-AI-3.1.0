@@ -4915,14 +4915,15 @@ console.log(
           sampleErrors.push({ index: i, error: 'NO_VALID_ENROLLMENT_WINDOWS' });
           continue;
         }
-        const consensus = buildConsensusEmbedding(windowEmbeddings);
+        const consensusResult = buildConsensusEmbeddingResult(windowEmbeddings);
+        const consensus = consensusResult.consensus;
         if (!Array.isArray(consensus) || consensus.length !== 512) {
           sampleErrors.push({ index: i, error: `CONSENSUS_DIM_INVALID (${Array.isArray(consensus) ? consensus.length : 0})` });
           continue;
         }
-        extractedEmbeddings.push(consensus, ...windowEmbeddings);
+        extractedEmbeddings.push(consensus, ...consensusResult.acceptedEmbeddings);
         acceptedAudioSamples += 1;
-        console.log(`[Speaker:EnrollExtract] name=${name.trim()} sample=${i} windows=${sourceWindows.length} acceptedWindows=${windowEmbeddings.length} persistedEmbeddings=${windowEmbeddings.length + 1}`);
+        console.log(`[Speaker:EnrollExtract] name=${name.trim()} sample=${i} windows=${sourceWindows.length} acceptedWindows=${consensusResult.acceptedEmbeddings.length} rejectedWindows=${consensusResult.rejectedCount} persistedEmbeddings=${consensusResult.acceptedEmbeddings.length + 1} consistency=${JSON.stringify(consensusResult.consistencyScores.slice(0, 8))}`);
       }
 
       if (extractedEmbeddings.length === 0) {
