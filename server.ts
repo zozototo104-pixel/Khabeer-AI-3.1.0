@@ -2627,6 +2627,8 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
     } catch (e: any) {
       console.error('Extract doc error:', e);
       res.status(500).json({ error: 'Failed to extract data: ' + e.message });
+    } finally {
+      await cleanupUploadedFile(req.file);
     }
   });
 
