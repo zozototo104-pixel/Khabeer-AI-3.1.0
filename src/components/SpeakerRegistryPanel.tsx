@@ -53,6 +53,25 @@ export const SpeakerRegistryPanel: React.FC<SpeakerRegistryPanelProps> = ({
   const sampleStreamRef = useRef<MediaStream | null>(null);
   const sampleProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const recordedChunksRef = useRef<Float32Array[]>([]);
+  const recordingSampleRateRef = useRef(16000);
+
+  // iOS/Safari may ignore AudioContext({ sampleRate: 16000 }) and capture at
+  // the hardware rate (typically 44.1/48 kHz). The server embedding model is
+  // strictly 16 kHz, so resample the PCM instead of only labelling it 16 kHz.
+  const resampleTo16k = (input: Float32Array, inputRate: number): Float32Array => {
+    if (!input.length || inputRate === 16000) return new Float32Array(input);
+    const outputLength = Math.max(1, Math.round(input.length * 16000 / inputRate));
+    const output = new Float32Array(outputLength);
+    const ratio = inputRate / 16000;
+    for (let i = 0; i < outputLength; i++) {
+      const position = i * ratio;
+      const left = Math.floor(position);
+      const right = Math.min(input.length - 1, left + 1);
+      const fraction = position - left;
+      output[i] = input[left] * (1 - fraction) + input[right] * fraction;
+    }
+    return output;
+  };
 
   // Cleanup on unmount
   useEffect(() => {
