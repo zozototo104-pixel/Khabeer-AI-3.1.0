@@ -12,6 +12,8 @@ interface IdentifyOptions {
   latencyMs?: number;
   source?: SpeakerDebugInfo['source'];
   createCandidate?: boolean;
+  /** Suppress candidate creation only when the best registered profile is close enough to need corroboration. */
+  suppressCandidateIfNearRegistered?: number;
   embeddingModel?: string;
   previousSpeakerId?: string | null;
 }
