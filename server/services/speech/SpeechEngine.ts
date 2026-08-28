@@ -622,6 +622,8 @@ export class SpeechEngine {
     this.activeSpeechSessions.delete(sessionId);
     this.liveEvidence.delete(sessionId);
     this.nearRegisteredEvidence.delete(sessionId);
+    this.speechSerial.delete(sessionId);
+    this.recentVerifiedProbe.delete(sessionId);
   }
 
   /**
