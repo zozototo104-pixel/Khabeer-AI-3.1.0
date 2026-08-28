@@ -2165,7 +2165,7 @@ ${memoryContext}`;
           if (pendingSpeechEndTimer) {
             clearTimeout(pendingSpeechEndTimer);
             pendingSpeechEndTimer = null;
-            console.log('[VoiceWS] Cancelled pending speech_end finalization because speech resumed', { sid, turn: currentTurn });
+            console.log('[VoiceWS] Cancelled pending speech_end finalization because speech resumed', { sid, turn: liveTurnSequence });
           }
           lastSpeakerTask = null;
           pendingSelfIdentifiedName = '';
