@@ -3602,7 +3602,7 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
       }
 
       const result = await runKnowledgeIngestion({
-        buffer: req.file.buffer,
+        buffer: fileBuffer,
         fileName: originalName,
         mimeType,
       }, {
