@@ -3787,6 +3787,7 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
 
       const updates: Record<string, unknown> = { updatedAt: new Date() };
       const auditParts: string[] = [];
+      let replacementBuffer: Buffer | null = null;
 
       // Rename
       const newTitle = req.body?.title;
