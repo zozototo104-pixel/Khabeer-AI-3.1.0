@@ -509,6 +509,8 @@ export class SpeechEngine {
     diarizer.retainRecentSamples(Math.floor(SPEAKER_THRESHOLDS.SAMPLE_RATE * 0.4));
     this.activeSpeechSessions.add(sessionId);
     this.lastProbeAt.set(sessionId, 0);
+    const nextSerial = (this.speechSerial.get(sessionId) || 0) + 1;
+    this.speechSerial.set(sessionId, nextSerial);
     // SECTION B FIX (regression): previously this called
     // `this.liveEvidence.delete(sessionId)` on every speech_start, which
     // also fires on VAD micro-pauses (breaths between sentences). That
