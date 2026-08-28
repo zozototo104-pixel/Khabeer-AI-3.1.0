@@ -4996,8 +4996,12 @@ console.log(
           embeddingsCount: profile.embeddings.length,
           centroidDimension: profile.centroidEmbedding.length,
         },
-        acceptedSamples: acceptedAudioSamples,
+        // Backward-compatible API contract: acceptedSamples historically meant
+        // persisted enrollment vectors. Keep it stable for existing UI/tests and
+        // expose acceptedAudioSamples separately for the new windowed pipeline.
+        acceptedSamples: extractedEmbeddings.length,
         acceptedEmbeddings: extractedEmbeddings.length,
+        acceptedAudioSamples,
         rejectedSamples: sampleErrors.length,
         sampleErrors: sampleErrors.length > 0 ? sampleErrors : undefined,
       });
