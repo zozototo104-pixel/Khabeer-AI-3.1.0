@@ -2237,7 +2237,8 @@ ${memoryContext}`;
                 console.warn('Final speaker identification failed:', error?.message || error);
                 return null;
               });
-          } catch(e) {}
+            } catch(e) {}
+          }, 700);
         } else if (msg.type === 'sync_speakers') {
           if (guestConnection) {
             if (clientWs.readyState === clientWs.OPEN) clientWs.send(JSON.stringify({ type: 'speaker_sync_rejected', reason: 'يتطلب تعديل مكتبة البصمات صلاحية مالك الاجتماع.' }));
