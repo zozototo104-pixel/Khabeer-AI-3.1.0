@@ -1032,6 +1032,7 @@ async function startServer() {
     let lastInjectedSpeakerId = '';
 let lastInjectedSpeakerTurnId = -1;
     let lastSpeakerTask: Promise<any> | null = null;
+    let pendingSpeechEndTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingSelfIdentifiedName = '';
     let activeSpeakerTurnId = 0;
     let activeSpeakerAttribution: {
