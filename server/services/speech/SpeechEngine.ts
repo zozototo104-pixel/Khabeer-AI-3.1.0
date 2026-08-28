@@ -304,10 +304,13 @@ export class SpeechEngine {
         this.probeInFlight.set(sessionId, probe);
         const result = await probe;
         
+        const corroboratedProbe = this.corroborateNearRegisteredMatch(result, sessionId) || result;
         // Log the probe result for diagnostic purposes
-        diarizer['callbacks']?.onDebugLog?.(`[Speaker:Probe] bestName=${result?.name} sim=${result?.similarity?.toFixed(3)} source=${result?.identitySource} prevId=${diarizer['currentSpeakerId']}`);
+        diarizer['callbacks']?.onDebugLog?.(`[Speaker:Probe] bestName=${corroboratedProbe?.name} sim=${corroboratedProbe?.similarity?.toFixed(3)} source=${corroboratedProbe?.identitySource} prevId=${diarizer['currentSpeakerId']}`);
         
-        const stableLive = this.stabilizeLiveProbe(result, sessionId);
+        const stableLive = corroboratedProbe?.identitySource === 'VERIFIED'
+          ? corroboratedProbe
+          : this.stabilizeLiveProbe(corroboratedProbe, sessionId);
         if (stableLive) {
           return {
             speakerId: stableLive.speakerId,
