@@ -526,6 +526,9 @@ async function extractPdfWithVerifiedOcr(
         pageTexts[index] = `[[الصفحة ${pageNumber}]]\n[لم يتوفر نص موثوق لهذه الصفحة؛ يجب الرجوع إلى الأصل عند الاستناد إليها.]`;
       }
 
+      const processedPages = pageTexts.reduce((count, text) => count + (text ? 1 : 0), 0);
+      await onProgress?.({ processedPages, pageCount, stage: 'page' });
+
       if (imagePath) await fs.unlink(imagePath).catch(() => undefined);
     };
 
