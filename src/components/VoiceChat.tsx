@@ -1885,18 +1885,27 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
             ? Math.max(0.045, noiseFloorRef.current * 3.0)
             : Math.max(0.005, noiseFloorRef.current * 1.5);
 
-          // Near-end speech / echo guard. The previous 6/8-frame RMS-only gate
-          // repeatedly classified the expert's own iPhone speaker output as a
-          // USER_BARGE_IN (production traces showed false triggers around
-          // RMS 0.096-0.124). Keep fast interruption only for unmistakably
-          // close speech; ordinary above-threshold energy must persist longer.
-          // This is deliberately conservative until the server-side Silero VAD
-          // confirmation path is active: false interruption is substantially
-          // worse than ~0.5s additional barge-in latency.
-          const strongBargeIn = isAiPlaying && rms >= Math.max(0.145, startThreshold * 1.70);
-          const requiredSpeechFrames = isAiPlaying ? (strongBargeIn ? 7 : 12) : 2;
+          // Near-end speech / echo guard. Browser AEC is advisory and Safari may
+          // still leak the expert's speaker output into the mic, so local
+          // barge-in during AI playback must be echo-aware rather than a plain
+          // RMS threshold. The first playback frames are especially echo-prone;
+          // require sustained, above-echo energy before interrupting the turn.
+          const aiPlaybackAgeMs = isAiPlaying && aiPlaybackStartedAtRef.current > 0
+            ? Date.now() - aiPlaybackStartedAtRef.current
+            : Number.POSITIVE_INFINITY;
+          if (isAiPlaying) {
+            echoGuardPeakRmsRef.current = Math.max(echoGuardPeakRmsRef.current * 0.995, rms);
+          } else {
+            echoGuardPeakRmsRef.current = 0;
+          }
+          const echoRelativeThreshold = Math.max(startThreshold, echoGuardPeakRmsRef.current * 1.18);
+          const playbackWarmupHoldoff = isAiPlaying && aiPlaybackAgeMs < 650;
+          const strongBargeIn = isAiPlaying && !playbackWarmupHoldoff && rms >= Math.max(0.150, echoRelativeThreshold * 1.12);
+          const requiredSpeechFrames = isAiPlaying ? (strongBargeIn ? 8 : 18) : 2;
           const isCurrentlySpeaking = vadSpeechFramesRef.current >= requiredSpeechFrames;
-          const speechThreshold = isCurrentlySpeaking ? stopThreshold : startThreshold;
+          const speechThreshold = isAiPlaying
+            ? (isCurrentlySpeaking ? stopThreshold : echoRelativeThreshold)
+            : (isCurrentlySpeaking ? stopThreshold : startThreshold);
 
           // Only update noise floor during confirmed silence and when AI is not playing
           if (rms < startThreshold && !isCurrentlySpeaking && !isAiPlaying) {
