@@ -77,13 +77,14 @@ export const SpeakerRegistryPanel: React.FC<SpeakerRegistryPanelProps> = ({
   const resampleTo16k = async (input: Float32Array, inputRate: number): Promise<Float32Array> => {
     if (!input.length || inputRate === 16000) return new Float32Array(input);
     const outputLength = Math.max(1, Math.round(input.length * 16000 / inputRate));
-    if (typeof OfflineAudioContext !== 'undefined') {
+    const OfflineCtx = window.OfflineAudioContext || (window as any).webkitOfflineAudioContext;
+    if (typeof OfflineCtx !== 'undefined') {
       try {
-        const bufferContext = new OfflineAudioContext(1, input.length, inputRate);
+        const bufferContext = new OfflineCtx(1, input.length, inputRate);
         const buffer = bufferContext.createBuffer(1, input.length, inputRate);
         buffer.copyToChannel(input, 0);
 
-        const renderContext = new OfflineAudioContext(1, outputLength, 16000);
+        const renderContext = new OfflineCtx(1, outputLength, 16000);
         const source = renderContext.createBufferSource();
         source.buffer = buffer;
         source.connect(renderContext.destination);
