@@ -820,7 +820,10 @@ async function drainKnowledgeProcessingQueue() {
         .innerJoin(knowledgeFiles, eq(knowledgeFiles.knowledgeId, knowledge.id))
         .where(or(
           eq(knowledge.processingStatus, 'PENDING'),
-          eq(knowledge.processingStatus, 'PROCESSING'),
+          and(
+            eq(knowledge.processingStatus, 'PROCESSING'),
+            lt(knowledge.updatedAt, staleProcessingBefore),
+          ),
         ))
         .orderBy(asc(knowledge.createdAt))
         .limit(1);
