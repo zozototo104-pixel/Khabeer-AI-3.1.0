@@ -23,7 +23,7 @@ import {
   updateSessionTitle,
 } from './src/db/chat.ts';
 import { getPersistentSpeakerProfiles, replacePersistentSpeakerProfiles } from './src/db/speakers.ts';
-import { buildConsensusEmbedding, selectSpeakerWindows } from './src/lib/speaker/SpeakerWindowing.ts';
+import { buildConsensusEmbeddingResult, selectSpeakerWindows } from './src/lib/speaker/SpeakerWindowing.ts';
 import { requireAuth } from './src/middleware/auth.ts';
 import multer from 'multer';
 // P0-4 + P1-7 FIX: raise upload cap from 25 MB to 100 MB so larger regulation
