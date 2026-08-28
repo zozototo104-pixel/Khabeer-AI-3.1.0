@@ -211,7 +211,13 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
         const extractionLabel = data.extractionMethod === 'VERIFIED_OCR'
           ? ' بعد تشغيل OCR موثق'
           : '';
-        setStatusMessage({ type: 'success', text: `تم رفع وفهرسة المستند "${data.title || file.name}" بنجاح${extractionLabel} في قاعدة المعرفة.` });
+        const isBackgroundProcessing = data.processingStatus === 'PENDING' || data.processingStatus === 'PROCESSING' || data.extractionMethod === 'BACKGROUND_PDF';
+        setStatusMessage({
+          type: 'success',
+          text: isBackgroundProcessing
+            ? `تم حفظ الملف الأصلي "${data.title || file.name}" وبدأت معالجته في الخلفية. ستظهر الصفحات المعالجة تلقائيًا في القائمة.`
+            : `تم رفع وفهرسة المستند "${data.title || file.name}" بنجاح${extractionLabel} في قاعدة المعرفة.`,
+        });
         setTimeout(() => setShowSuccess(false), 4000);
       } else {
         throw new Error('لم يؤكد الخادم اكتمال حفظ الملف. لم تتم إضافته إلى القائمة.');
