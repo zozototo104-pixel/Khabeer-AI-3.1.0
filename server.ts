@@ -3627,9 +3627,9 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
               knowledgeId: insertedDoc.id,
               fileName: originalName,
               mimeType: mimeType || 'application/octet-stream',
-              fileSize: req.file.buffer.length,
+              fileSize: fileBuffer.length,
               sha256,
-              data: req.file.buffer,
+              data: fileBuffer,
             });
           });
           ragEngine.invalidateOrganization(org.id);
