@@ -432,11 +432,13 @@ export class SpeechEngine {
         if (!segment) segment = await diarizer.finalizeSegment();
         if (segment) {
           const registry = this.getSessionRegistry(sessionId);
+          const finalRegisteredProfiles = registry.getAllSpeakers().filter((profile) => !profile.isCandidate && profile.status === 'VALID' && profile.embeddingModel === this.provider.getModelId());
           const finalCheck = registry.identifySpeaker(segment.embedding, {
             segmentId: segment.id,
             source: this.provider.getName().includes('Neural') ? 'DEEP_NEURAL' : 'ACOUSTIC_FALLBACK',
             embeddingModel: this.provider.getModelId(),
-            createCandidate: false,
+            createCandidate: true,
+            suppressCandidateIfNearRegistered: finalRegisteredProfiles.length > 0 ? SHERPA_OFFICIAL_SEARCH_FLOOR : undefined,
           });
           const corroborated = this.corroborateNearRegisteredMatch(finalCheck, sessionId) || (finalCheck.identitySource === 'VERIFIED' ? finalCheck : null);
           if (corroborated) {
