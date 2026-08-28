@@ -58,8 +58,9 @@ export const SpeakerRegistryPanel: React.FC<SpeakerRegistryPanelProps> = ({
   // iOS/Safari may ignore AudioContext({ sampleRate: 16000 }) and capture at
   // the hardware rate (typically 44.1/48 kHz). The server embedding model is
   // strictly 16 kHz, so resample the PCM instead of only labelling it 16 kHz.
-  const resampleTo16k = (input: Float32Array, inputRate: number): Float32Array => {
-    if (!input.length || inputRate === 16000) return new Float32Array(input);
+  // Prefer the browser's OfflineAudioContext resampler over linear interpolation
+  // because speaker embeddings are sensitive to aliasing and spectral tilt.
+  const linearResampleTo16k = (input: Float32Array, inputRate: number): Float32Array => {
     const outputLength = Math.max(1, Math.round(input.length * 16000 / inputRate));
     const output = new Float32Array(outputLength);
     const ratio = inputRate / 16000;
@@ -71,6 +72,29 @@ export const SpeakerRegistryPanel: React.FC<SpeakerRegistryPanelProps> = ({
       output[i] = input[left] * (1 - fraction) + input[right] * fraction;
     }
     return output;
+  };
+
+  const resampleTo16k = async (input: Float32Array, inputRate: number): Promise<Float32Array> => {
+    if (!input.length || inputRate === 16000) return new Float32Array(input);
+    const outputLength = Math.max(1, Math.round(input.length * 16000 / inputRate));
+    if (typeof OfflineAudioContext !== 'undefined') {
+      try {
+        const bufferContext = new OfflineAudioContext(1, input.length, inputRate);
+        const buffer = bufferContext.createBuffer(1, input.length, inputRate);
+        buffer.copyToChannel(input, 0);
+
+        const renderContext = new OfflineAudioContext(1, outputLength, 16000);
+        const source = renderContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(renderContext.destination);
+        source.start(0);
+        const rendered = await renderContext.startRendering();
+        return new Float32Array(rendered.getChannelData(0));
+      } catch (error) {
+        console.warn('OfflineAudioContext resampling failed; falling back to linear interpolation:', error);
+      }
+    }
+    return linearResampleTo16k(input, inputRate);
   };
 
   // Cleanup on unmount
