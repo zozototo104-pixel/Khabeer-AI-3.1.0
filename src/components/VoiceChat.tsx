@@ -1924,13 +1924,18 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
           }
           setLiveNoiseFloor(noiseFloorRef.current);
 
-          const isSpeech = !playbackWarmupHoldoff && rms > speechThreshold;
+          const rawSpeech = !playbackWarmupHoldoff && rms > speechThreshold;
+          const isSpeech = isAiPlaying ? (rawSpeech && nearFieldVoice) : rawSpeech;
           if (isAiPlaying) {
-            // Learn playback echo only from non-speech frames. Do not let the
-            // user's barge-in voice raise the echo baseline above itself.
-            if (!isSpeech) echoGuardPeakRmsRef.current = Math.max(priorEchoPeak * 0.992, rms);
+            // Learn playback echo/ambient only from non-near-field frames. Do not
+            // let the user's barge-in voice raise the echo baseline above itself.
+            if (!nearFieldVoice) {
+              echoGuardPeakRmsRef.current = Math.max(priorEchoPeak * 0.992, rms);
+              ambientRmsRef.current = (ambientRmsRef.current * 0.985) + (rms * 0.015);
+            }
           } else {
             echoGuardPeakRmsRef.current = 0;
+            if (!rawSpeech) ambientRmsRef.current = (ambientRmsRef.current * 0.98) + (rms * 0.02);
           }
 
           // 3. VAD Engine & Fast Turn-taking
