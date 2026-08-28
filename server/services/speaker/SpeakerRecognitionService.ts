@@ -231,6 +231,16 @@ export class SpeakerRecognitionService {
     timeoutMs: number;
     timedOut?: boolean;
   }>();
+  private workerBusy = false;
+  private embeddingQueue: Array<{
+    id: number;
+    copy: Float32Array;
+    bypassVad: boolean;
+    label: string;
+    queuedAt: number;
+    resolve: (value: number[]) => void;
+    reject: (error: Error) => void;
+  }> = [];
 
   constructor(modelPath?: string) {
     this.modelPath = modelPath ? path.resolve(modelPath) : this.resolveBestModelPath();
