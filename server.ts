@@ -1460,8 +1460,22 @@ ${memoryContext}`;
                 }
                 return true;
               });
-              if (resolvedProfiles.length && dbSessionId) {
-                speechEngine.syncSpeakers(resolvedProfiles, String(dbSessionId));
+              console.log('[Speaker] Durable profile load for live session', {
+                uid,
+                dbSessionId,
+                durableProfiles: durableProfiles.length,
+                matchEligibleProfiles: resolvedProfiles.length,
+                profiles: resolvedProfiles.map((p: any) => ({
+                  id: p.id,
+                  name: p.name,
+                  model: p.embeddingModel,
+                  centroidDim: Array.isArray(p.centroidEmbedding) ? p.centroidEmbedding.length : 0,
+                  embeddings: Array.isArray(p.embeddings) ? p.embeddings.length : 0,
+                  sampleCount: p.sampleCount,
+                })),
+              });
+              if (dbSessionId) {
+                if (resolvedProfiles.length) speechEngine.syncSpeakers(resolvedProfiles, String(dbSessionId));
                 const syncedProfiles = speechEngine.getSpeakerProfiles(String(dbSessionId));
                 if (clientWs.readyState === clientWs.OPEN) {
                   clientWs.send(JSON.stringify({ type: 'speaker_profiles_synced', profiles: syncedProfiles }));
