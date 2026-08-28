@@ -146,7 +146,7 @@ export const SpeakerRegistryPanel: React.FC<SpeakerRegistryPanelProps> = ({
     }
   };
 
-  const finishSampleRecording = () => {
+  const finishSampleRecording = async () => {
     stopSampleRecording();
 
     // Concatenate chunks
