@@ -176,31 +176,24 @@ function sendLiveContext(session: any, text: string): void {
   const value = String(text || '').trim();
   if (!session || !value) return;
 
-  // Gemini Live ordering guarantee applies to clientContent, not realtimeInput.
-  // Use turnComplete:false so metadata is committed to context without asking
-  // the model to answer the metadata as a standalone user message.
-  if (typeof session.sendClientContent === 'function') {
+  // Do not inject speaker metadata through sendClientContent(turnComplete:false)
+  // while a realtime-audio session is active: that opens an incomplete ordered
+  // client turn and can leave Gemini waiting instead of answering the next audio
+  // request. Keep this metadata on the low-latency realtime path.
+  if (typeof session.sendRealtimeInput === 'function') {
     try {
-      session.sendClientContent({
-        turns: [{ role: 'user', parts: [{ text: value }] }],
-        turnComplete: false,
-      });
+      session.sendRealtimeInput({ text: value });
       return;
     } catch (error) {
-      console.warn('Gemini Live speaker-context sendClientContent failed:', error);
+      console.warn('Gemini Live speaker-context sendRealtimeInput failed:', error);
     }
   }
 
   if (typeof session.send === 'function') {
     try {
-      session.send({
-        clientContent: {
-          turns: [{ role: 'user', parts: [{ text: value }] }],
-          turnComplete: false,
-        },
-      });
+      session.send({ realtimeInput: { text: value } });
     } catch (error) {
-      console.warn('Gemini Live speaker-context clientContent failed:', error);
+      console.warn('Gemini Live speaker-context realtimeInput failed:', error);
     }
   }
 }
