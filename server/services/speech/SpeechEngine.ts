@@ -449,7 +449,13 @@ export class SpeechEngine {
             createCandidate: true,
             suppressCandidateIfNearRegistered: finalRegisteredProfiles.length > 0 ? SHERPA_OFFICIAL_SEARCH_FLOOR : undefined,
           });
-          const corroborated = this.corroborateNearRegisteredMatch(finalCheck, sessionId) || (finalCheck.identitySource === 'VERIFIED' ? finalCheck : null);
+          let corroborated = this.corroborateNearRegisteredMatch(finalCheck, sessionId) || (finalCheck.identitySource === 'VERIFIED' ? finalCheck : null);
+          const recentProbe = this.recentVerifiedProbe.get(sessionId);
+          const currentSerial = this.speechSerial.get(sessionId) || 0;
+          if (!corroborated && recentProbe && recentProbe.serial === currentSerial && Date.now() - recentProbe.at <= 8_000) {
+            corroborated = recentProbe.result;
+            console.warn(`[SpeechEngine][${sessionId}] FINAL_USED_RECENT_VERIFIED_PROBE name=${recentProbe.result.name} similarity=${recentProbe.result.similarity.toFixed(4)} finalIdentity=${finalCheck.identitySource} finalSimilarity=${finalCheck.similarity.toFixed(4)}`);
+          }
           if (corroborated) {
             segment = {
               ...segment,
