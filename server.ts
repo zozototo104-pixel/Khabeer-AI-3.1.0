@@ -30,9 +30,20 @@ import multer from 'multer';
 // P0-4 + P1-7 FIX: raise upload cap from 25 MB to 100 MB so larger regulation
 // documents and PDFs can be ingested. The previous 25 MB cap was blocking the
 // user's stated requirement: "ارفع الملفات بكل الصيغ وأحجامها الكبيرة".
-// (Async job processing for very large files is still a P2 item.)
+// Large PDF uploads must not be retained in V8 heap. Store multipart bodies on
+// Render's ephemeral disk, then read/cleanup explicitly in each endpoint after
+// the source bytes have been persisted or processed.
+const uploadTempDir = path.join(os.tmpdir(), 'khabeer-uploads');
+mkdirSync(uploadTempDir, { recursive: true });
+
 const upload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadTempDir),
+    filename: (_req, file, cb) => {
+      const safeOriginal = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-96);
+      cb(null, `${Date.now()}-${randomBytes(8).toString('hex')}-${safeOriginal}`);
+    },
+  }),
   limits: { fileSize: 100 * 1024 * 1024, files: 1 },
 });
 // P0-4 FIX: dedicated multer error handler. Without this, a MulterError
