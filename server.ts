@@ -2535,6 +2535,7 @@ ${memoryContext}`;
   app.post('/api/extract-document', requireAuth, upload.single('file'), multerErrorHandler, async (req: any, res) => {
     try {
       if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+      const fileBuffer = await readUploadedFileBuffer(req.file);
       
       req.file.originalname = normalizeUploadedFileName(req.file.originalname, req.body.originalName);
       const originalName = req.file.originalname.toLowerCase();
