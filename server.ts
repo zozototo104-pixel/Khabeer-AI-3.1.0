@@ -3866,6 +3866,8 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
     } catch (e: any) {
       console.error('PATCH /api/knowledge/:id error:', e);
       res.status(500).json({ error: e?.message || 'Failed to update knowledge document' });
+    } finally {
+      await cleanupUploadedFile(req.file);
     }
   });
 
