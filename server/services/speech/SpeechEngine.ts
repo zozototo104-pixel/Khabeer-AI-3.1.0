@@ -124,6 +124,53 @@ export class SpeechEngine {
   }
 
 
+  private corroborateNearRegisteredMatch(
+    result: SpeakerIdentificationResult | null,
+    sessionId: string,
+  ): SpeakerIdentificationResult | null {
+    if (!result || result.identitySource === 'VERIFIED') return result;
+    const bestSpeakerId = result.debugInfo?.bestSpeakerId;
+    const bestSpeakerName = result.debugInfo?.bestSpeakerName;
+    const comparisons = Array.isArray(result.debugInfo?.speakerComparisons) ? result.debugInfo.speakerComparisons : [];
+    const bestComparison = comparisons.find((comparison) => comparison.speakerId === bestSpeakerId && comparison.eligible !== false);
+    const bestScore = bestComparison?.finalSimilarity ?? result.similarity ?? 0;
+    if (!bestSpeakerId || !bestSpeakerName || bestScore < SHERPA_OFFICIAL_SEARCH_FLOOR) return null;
+
+    const now = Date.now();
+    const previous = this.nearRegisteredEvidence.get(sessionId);
+    const same = previous && previous.speakerId === bestSpeakerId && now - previous.lastAt <= 12_000;
+    const evidence = same
+      ? { speakerId: bestSpeakerId, name: bestSpeakerName, hits: previous.hits + 1, scoreSum: previous.scoreSum + bestScore, lastAt: now }
+      : { speakerId: bestSpeakerId, name: bestSpeakerName, hits: 1, scoreSum: bestScore, lastAt: now };
+    this.nearRegisteredEvidence.set(sessionId, evidence);
+
+    const average = evidence.scoreSum / evidence.hits;
+    const margin = Number(result.debugInfo?.margin || 0);
+    const competingProfiles = comparisons.filter((comparison) => comparison.speakerId !== bestSpeakerId && comparison.eligible !== false);
+    const enoughMargin = competingProfiles.length <= 0 || margin >= SPEAKER_THRESHOLDS.MIN_DECISION_MARGIN;
+    if (evidence.hits < 2 || average < SHERPA_OFFICIAL_SEARCH_FLOOR || !enoughMargin) {
+      console.warn(`[SpeechEngine][${sessionId}] NEAR_REGISTERED_PENDING speaker=${bestSpeakerName} score=${bestScore.toFixed(4)} hits=${evidence.hits} avg=${average.toFixed(4)} margin=${margin.toFixed(4)}`);
+      return null;
+    }
+
+    console.warn(`[SpeechEngine][${sessionId}] NEAR_REGISTERED_CORROBORATED speaker=${bestSpeakerName} score=${bestScore.toFixed(4)} hits=${evidence.hits} avg=${average.toFixed(4)} margin=${margin.toFixed(4)}`);
+    return {
+      ...result,
+      speakerId: bestSpeakerId,
+      name: bestSpeakerName,
+      similarity: average,
+      confidence: average >= SPEAKER_THRESHOLDS.MEDIUM_CONFIDENCE_THRESHOLD ? 'MEDIUM' : 'LOW',
+      status: 'SUCCESS',
+      isNewCandidate: false,
+      identitySource: 'VERIFIED',
+      debugInfo: {
+        ...result.debugInfo,
+        decisionReason: 'CORROBORATED_REGISTERED_MATCH',
+        clusterId: bestSpeakerId,
+      },
+    };
+  }
+
   /**
    * Fast/Final split inspired by WhoSpeaksLive: a very strong live probe may
    * light the speaker immediately, while medium evidence needs corroboration.
