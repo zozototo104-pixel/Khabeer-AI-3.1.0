@@ -324,19 +324,37 @@ export class SpeakerRecognitionService {
             this.onnxRuntimeVersion = String(message.onnxruntimeVersion || '');
             this.neuralAvailable = true;
             this.loadError = '';
-            console.log(`[SpeakerRecognition] Neural worker ready from ${this.modelPath} (Dimension: ${this.embeddingDimension})`);
+            console.log(`[SpeakerRecognition] Neural worker ready from ${this.modelPath} (Dimension: ${this.embeddingDimension}) metrics=${JSON.stringify(message.metrics || {})}`);
             resolve(true);
             return;
           }
           if (message?.type === 'init_error') {
+            console.error(`[SpeakerRecognition] Worker init failed metrics=${JSON.stringify(message.metrics || {})} error=${String(message.error || 'SPEAKER_WORKER_INIT_FAILED')}`);
             failInit(String(message.error || 'SPEAKER_WORKER_INIT_FAILED'));
             return;
           }
           if (message?.type === 'result' || message?.type === 'error') {
-            const pending = this.pending.get(Number(message.id));
-            if (!pending) return;
+            const id = Number(message.id);
+            const pending = this.pending.get(id);
+            if (!pending) {
+              console.warn(`[SpeakerRecognition] Received ${message.type} for unknown request id=${id} metrics=${JSON.stringify(message.metrics || {})}`);
+              return;
+            }
             clearTimeout(pending.timer);
-            this.pending.delete(Number(message.id));
+            if (pending.cleanupTimer) clearTimeout(pending.cleanupTimer);
+            this.pending.delete(id);
+            const metrics = {
+              ...(message.metrics || {}),
+              requestId: id,
+              label: pending.label,
+              hostElapsedMs: Date.now() - pending.queuedAt,
+              timedOut: pending.timedOut === true,
+              timeoutMs: pending.timeoutMs,
+            };
+            const logLine = `[SpeakerRecognition] embedding ${message.type} id=${id} label=${pending.label} metrics=${JSON.stringify(metrics)}`;
+            if (message.type === 'error' || pending.timedOut) console.warn(logLine);
+            else console.log(logLine);
+            if (pending.timedOut) return;
             if (message.type === 'result') {
               const embedding = Array.isArray(message.embedding) ? message.embedding : [];
               if (embedding.length !== EXPECTED_EMBEDDING_DIM) {
