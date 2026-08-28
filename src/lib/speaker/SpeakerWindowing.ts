@@ -42,20 +42,50 @@ export function selectSpeakerWindows(pcm: Float32Array, maxWindows = 3): Float32
     .map((entry) => entry.pcm);
 }
 
-/** Robustly average embeddings while rejecting one acoustically inconsistent window. */
-export function buildConsensusEmbedding(embeddings: number[][]): number[] {
+export interface ConsensusEmbeddingResult {
+  consensus: number[];
+  acceptedEmbeddings: number[][];
+  rejectedCount: number;
+  consistencyScores: number[];
+}
+
+/**
+ * Robustly average embeddings while removing acoustically inconsistent windows
+ * before they enter the persistent voiceprint gallery. The same filtering is
+ * used by buildConsensusEmbedding() for backward compatibility.
+ */
+export function buildConsensusEmbeddingResult(embeddings: number[][]): ConsensusEmbeddingResult {
   const valid = embeddings.filter((embedding) => embedding.length > 0 && embedding.every(Number.isFinite));
-  if (!valid.length) return [];
-  if (valid.length === 1) return Array.from(AudioFeatures.l2Normalize(valid[0]));
+  if (!valid.length) return { consensus: [], acceptedEmbeddings: [], rejectedCount: 0, consistencyScores: [] };
+  if (valid.length === 1) {
+    const normalized = Array.from(AudioFeatures.l2Normalize(valid[0]));
+    return { consensus: normalized, acceptedEmbeddings: [normalized], rejectedCount: 0, consistencyScores: [1] };
+  }
+
   const dimension = valid[0].length;
   const sameDimension = valid.filter((embedding) => embedding.length === dimension);
+  if (!sameDimension.length) return { consensus: [], acceptedEmbeddings: [], rejectedCount: valid.length, consistencyScores: [] };
+
   const provisional = AudioFeatures.computeCentroid(sameDimension);
   const ranked = sameDimension
-    .map((embedding) => ({ embedding, similarity: AudioFeatures.cosineSimilarity(embedding, provisional) }))
+    .map((embedding) => ({
+      embedding: Array.from(AudioFeatures.l2Normalize(embedding)),
+      similarity: AudioFeatures.cosineSimilarity(embedding, provisional),
+    }))
     .sort((a, b) => b.similarity - a.similarity);
   const best = ranked[0]?.similarity ?? 0;
-  const consistent = ranked
-    .filter((item) => item.similarity >= 0.60 && item.similarity >= best - 0.08)
-    .map((item) => item.embedding);
-  return AudioFeatures.computeCentroid(consistent.length ? consistent : [ranked[0].embedding]);
+  const consistent = ranked.filter((item) => item.similarity >= 0.60 && item.similarity >= best - 0.08);
+  const accepted = (consistent.length ? consistent : [ranked[0]]).map((item) => item.embedding);
+
+  return {
+    consensus: AudioFeatures.computeCentroid(accepted),
+    acceptedEmbeddings: accepted,
+    rejectedCount: sameDimension.length - accepted.length,
+    consistencyScores: ranked.map((item) => item.similarity),
+  };
+}
+
+/** Robustly average embeddings while rejecting acoustically inconsistent windows. */
+export function buildConsensusEmbedding(embeddings: number[][]): number[] {
+  return buildConsensusEmbeddingResult(embeddings).consensus;
 }
