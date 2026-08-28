@@ -1893,15 +1893,14 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
           const aiPlaybackAgeMs = isAiPlaying && aiPlaybackStartedAtRef.current > 0
             ? Date.now() - aiPlaybackStartedAtRef.current
             : Number.POSITIVE_INFINITY;
-          if (isAiPlaying) {
-            echoGuardPeakRmsRef.current = Math.max(echoGuardPeakRmsRef.current * 0.995, rms);
-          } else {
-            echoGuardPeakRmsRef.current = 0;
-          }
-          const echoRelativeThreshold = Math.max(startThreshold, echoGuardPeakRmsRef.current * 1.18);
-          const playbackWarmupHoldoff = isAiPlaying && aiPlaybackAgeMs < 650;
-          const strongBargeIn = isAiPlaying && !playbackWarmupHoldoff && rms >= Math.max(0.150, echoRelativeThreshold * 1.12);
-          const requiredSpeechFrames = isAiPlaying ? (strongBargeIn ? 8 : 18) : 2;
+          const priorEchoPeak = isAiPlaying ? echoGuardPeakRmsRef.current : 0;
+          const echoRelativeThreshold = Math.max(startThreshold, priorEchoPeak * 1.12);
+          // Keep a short warmup guard for speaker click/echo, but allow a truly
+          // near-field human voice to break through immediately.
+          const warmupBreakthroughThreshold = Math.max(0.180, echoRelativeThreshold * 1.35);
+          const playbackWarmupHoldoff = isAiPlaying && aiPlaybackAgeMs < 350 && rms < warmupBreakthroughThreshold;
+          const strongBargeIn = isAiPlaying && !playbackWarmupHoldoff && rms >= Math.max(0.120, echoRelativeThreshold * 1.18);
+          const requiredSpeechFrames = isAiPlaying ? (strongBargeIn ? 5 : 10) : 2;
           const isCurrentlySpeaking = vadSpeechFramesRef.current >= requiredSpeechFrames;
           const speechThreshold = isAiPlaying
             ? (isCurrentlySpeaking ? stopThreshold : echoRelativeThreshold)
@@ -1913,7 +1912,14 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
           }
           setLiveNoiseFloor(noiseFloorRef.current);
 
-          const isSpeech = rms > speechThreshold;
+          const isSpeech = !playbackWarmupHoldoff && rms > speechThreshold;
+          if (isAiPlaying) {
+            // Learn playback echo only from non-speech frames. Do not let the
+            // user's barge-in voice raise the echo baseline above itself.
+            if (!isSpeech) echoGuardPeakRmsRef.current = Math.max(priorEchoPeak * 0.992, rms);
+          } else {
+            echoGuardPeakRmsRef.current = 0;
+          }
 
           // 3. VAD Engine & Fast Turn-taking
           if (isSpeech) {
