@@ -3533,6 +3533,7 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
     let logKnowledge: ReturnType<typeof createKnowledgeUploadLogger> | null = null;
     try {
       if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+      const fileBuffer = await readUploadedFileBuffer(req.file);
 
       req.file.originalname = normalizeUploadedFileName(req.file.originalname, req.body.originalName);
       const startedAt = Number(req.knowledgeUploadStartedAt || Date.now());
