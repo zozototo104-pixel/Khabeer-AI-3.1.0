@@ -166,7 +166,7 @@ export const SpeakerRegistryPanel: React.FC<SpeakerRegistryPanelProps> = ({
       offset += c.length;
     }
 
-    const pcm16k = resampleTo16k(pcm, recordingSampleRateRef.current);
+    const pcm16k = await resampleTo16k(pcm, recordingSampleRateRef.current);
     if (pcm16k.length < 16000 * 0.4) {
       alert('العينة الصوتية قصيرة جداً بعد تحويلها إلى 16kHz، يرجى إعادة التسجيل.');
       return;
