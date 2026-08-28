@@ -375,14 +375,16 @@ export class SpeechEngine {
       if (!enrollmentEmbeddings.length) {
         throw new Error('SPEAKER_ENROLLMENT_NO_VALID_EMBEDDING');
       }
-      // Register a single robust centroid first, then retain the individual
-      // samples as gallery exemplars for microphone/phonetic variation.
-      const consensus = buildConsensusEmbedding(enrollmentEmbeddings);
-      const profile = registry.registerOrUpdateSpeaker(name, consensus, { embeddingModel: this.provider.getModelId() });
-      for (const sampleEmbedding of enrollmentEmbeddings) {
+      // Register a single robust centroid first, then retain only the
+      // acoustically consistent gallery exemplars. Persisting every window can
+      // pollute the centroid with noisy/misaligned enrollment fragments and
+      // lower same-speaker scores later in the same room.
+      const consensusResult = buildConsensusEmbeddingResult(enrollmentEmbeddings);
+      const profile = registry.registerOrUpdateSpeaker(name, consensusResult.consensus, { embeddingModel: this.provider.getModelId() });
+      for (const sampleEmbedding of consensusResult.acceptedEmbeddings) {
         registry.updateSpeaker(profile.id, sampleEmbedding, 'HIGH', true);
       }
-      console.log(`[SpeechEngine][${sessionId}] Enrolled ${name} from ${enrollmentEmbeddings.length} verified voice windows.`);
+      console.log(`[SpeechEngine][${sessionId}] Enrolled ${name} windows=${enrollmentEmbeddings.length} accepted=${consensusResult.acceptedEmbeddings.length} rejected=${consensusResult.rejectedCount} consistency=${JSON.stringify(consensusResult.consistencyScores.slice(0, 8))}`);
       return profile;
     } else if (Array.isArray(initialPcmOrEmbedding)) {
       embedding = initialPcmOrEmbedding;
