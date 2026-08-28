@@ -458,8 +458,14 @@ export class SpeakerRecognitionService {
         if (stillPending === pending) {
           this.pending.delete(request.id);
           this.workerBusy = false;
-          console.error(`[SpeakerRecognition] embedding abandoned after timeout id=${request.id} label=${request.label}`);
-          this.dispatchNextEmbedding();
+          this.neuralAvailable = false;
+          this.workerReady = null;
+          const abandonedError = new Error('SPEAKER_WORKER_RESET_AFTER_TIMEOUT');
+          for (const queued of this.embeddingQueue.splice(0)) queued.reject(abandonedError);
+          const stuckWorker = this.worker;
+          this.worker = null;
+          console.error(`[SpeakerRecognition] embedding abandoned after timeout id=${request.id} label=${request.label}; resetting worker`);
+          if (stuckWorker) void stuckWorker.terminate().catch(() => undefined);
         }
       }, Math.max(60_000, timeoutMs * 4));
     }, timeoutMs);
