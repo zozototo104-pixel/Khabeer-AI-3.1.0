@@ -142,7 +142,12 @@ export const SpeakerRegistryPanel: React.FC<SpeakerRegistryPanelProps> = ({
       offset += c.length;
     }
 
-    setEnrollSamples(prev => [...prev, pcm]);
+    const pcm16k = resampleTo16k(pcm, recordingSampleRateRef.current);
+    if (pcm16k.length < 16000 * 0.4) {
+      alert('العينة الصوتية قصيرة جداً بعد تحويلها إلى 16kHz، يرجى إعادة التسجيل.');
+      return;
+    }
+    setEnrollSamples(prev => [...prev, pcm16k]);
   };
 
   const stopSampleRecording = () => {
