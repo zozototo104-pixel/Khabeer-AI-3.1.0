@@ -226,7 +226,41 @@ export class SpeechEngine {
       try {
         const activeProbe = this.probeInFlight.get(sessionId);
         if (activeProbe) await activeProbe.catch(() => null);
-        const segment = await diarizer.finalizeSegment();
+        let segment: SpeechSegment | null = null;
+        try {
+          const regions = await sortformerDiarizationService.diarize(combined);
+          const registry = this.getSessionRegistry(sessionId);
+          let best: { region: (typeof regions)[number]; embedding: number[]; result: ReturnType<SpeakerRegistry['identifySpeaker']> } | null = null;
+          for (const region of regions) {
+            const windows = selectSpeakerWindows(region.pcm, 2);
+            for (const window of windows.length ? windows : [region.pcm]) {
+              if (window.length < SPEAKER_THRESHOLDS.SAMPLE_RATE) continue;
+              const embedding = await this.provider.extractEmbedding(window);
+              const result = registry.identifySpeaker(embedding, `${sessionId}:${region.speaker}`);
+              if (!best || result.similarity > best.result.similarity) best = { region, embedding, result };
+              if (result.identitySource === 'VERIFIED') break;
+            }
+          }
+          if (best) {
+            segment = {
+              id: Date.now(),
+              startTime: Date.now() - Math.round((best.region.endSec - best.region.startSec) * 1000),
+              endTime: Date.now(),
+              durationMs: Math.round((best.region.endSec - best.region.startSec) * 1000),
+              speakerId: best.result.speakerId || 'speaker_unknown',
+              speakerName: best.result.name,
+              confidence: best.result.confidence,
+              similarity: best.result.similarity,
+              identitySource: best.result.identitySource,
+              pcmData: best.region.pcm,
+              embedding: best.embedding,
+            };
+            console.log(`[Sortformer] session=${sessionId} speakers=${new Set(regions.map((r) => r.speaker)).size} regions=${regions.length} selected=${best.region.speaker} identity=${best.result.name} similarity=${best.result.similarity.toFixed(3)}`);
+          }
+        } catch (error) {
+          console.warn('[Sortformer] Native diarization failed; falling back to legacy diarizer:', error);
+        }
+        if (!segment) segment = await diarizer.finalizeSegment();
         if (segment) {
           return {
             speakerId: segment.speakerId === 'speaker_unknown' ? null : segment.speakerId,
