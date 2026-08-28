@@ -2585,7 +2585,7 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
                 { text: prompt },
                 {
                   inlineData: {
-                    data: req.file.buffer.toString("base64"),
+                    data: fileBuffer.toString("base64"),
                     mimeType: "application/pdf"
                   }
                 }
