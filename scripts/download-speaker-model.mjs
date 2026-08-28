@@ -3,9 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 
-const fileName = '3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx';
-const expectedSha256 = '1a331345f04805badbb495c775a6ddffcdd1a732567d5ec8b3d5749e3c7a5e4b';
-const expectedSize = 39_593_761;
+// sherpa-onnx's current speaker-identification documentation uses CAM++ as
+// the reference embedding model. 3D-Speaker also reports a lower VoxCeleb1-O
+// EER for CAM++ (0.65%) than the ERes2Net-base model (0.84%) we used before.
+const fileName = '3dspeaker_speech_campplus_sv_zh-cn_16k-common.onnx';
+const expectedSha256 = 'f682b514c05d947ee3fa91cd6ec6c5c7543479a128373fa29b1faedccd21fd11';
 const sources = [
   `https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/${fileName}`,
   `https://huggingface.co/csukuangfj/speaker-embedding-models/resolve/main/${fileName}`,
