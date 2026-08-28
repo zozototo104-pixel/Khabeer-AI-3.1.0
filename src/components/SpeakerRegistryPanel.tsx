@@ -91,6 +91,7 @@ export const SpeakerRegistryPanel: React.FC<SpeakerRegistryPanelProps> = ({
 
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
       sampleAudioCtxRef.current = audioCtx;
+      recordingSampleRateRef.current = audioCtx.sampleRate;
 
       const source = audioCtx.createMediaStreamSource(stream);
       const processor = audioCtx.createScriptProcessor(2048, 1, 1);
