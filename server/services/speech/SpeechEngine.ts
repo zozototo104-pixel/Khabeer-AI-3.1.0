@@ -373,10 +373,12 @@ export class SpeechEngine {
               trackDiagnostics.push({ speaker, samples: trackPcm.length, windows: candidateWindows.length, accepted: 0, rejected: embeddings.length, identity: 'NO_VALID_EMBEDDING' });
               continue;
             }
-            const result = registry.identifySpeaker(consensus.consensus, {
+            const rawResult = registry.identifySpeaker(consensus.consensus, {
               source: 'DEEP_NEURAL',
               embeddingModel: this.provider.getModelId(),
+              createCandidate,
             });
+            const result = this.corroborateNearRegisteredMatch(rawResult, sessionId) || rawResult;
             trackDiagnostics.push({
               speaker,
               samples: trackPcm.length,
