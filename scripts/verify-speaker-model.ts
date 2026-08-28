@@ -18,7 +18,7 @@ for (let index = 0; index < pcm.length; index++) {
 
 // The synthetic waveform validates the embedding model/runtime, not VAD.
 // Production recognition keeps Silero enabled because bypassVad defaults false.
-const embedding = await speakerRecognitionService.getEmbedding(pcm, { bypassVad: true });
+const embedding = await speakerRecognitionService.getEmbedding(pcm, { bypassVad: true, label: 'verify-speaker-model' });
 assert.equal(embedding.length, 512);
 assert.ok(embedding.every(Number.isFinite));
 const norm = Math.sqrt(embedding.reduce((sum, value) => sum + value * value, 0));
