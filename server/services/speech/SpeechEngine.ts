@@ -238,7 +238,7 @@ export class SpeechEngine {
             const windows = selectSpeakerWindows(region.pcm, 2);
             for (const window of windows.length ? windows : [region.pcm]) {
               if (window.length < SPEAKER_THRESHOLDS.SAMPLE_RATE) continue;
-              const embedding = await this.provider.extractEmbedding(window);
+              const embedding = await this.provider.extractEmbedding(window, { label: `sortformer:${sessionId}:${region.speaker}` });
               const result = registry.identifySpeaker(embedding, {
                 source: 'DEEP_NEURAL',
                 embeddingModel: this.provider.getModelId(),
