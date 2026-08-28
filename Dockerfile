@@ -22,7 +22,11 @@ RUN npm run lint \
 FROM node:22-bookworm-slim AS sortformer
 WORKDIR /app
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates git build-essential cmake ninja-build pkg-config libsentencepiece-dev python3 python3-venv python3-pip \
+  && apt-get install -y --no-install-recommends ca-certificates curl git build-essential ninja-build pkg-config libsentencepiece-dev python3 python3-venv python3-pip \
+  && curl -fsSL https://github.com/Kitware/CMake/releases/download/v4.1.1/cmake-4.1.1-linux-x86_64.tar.gz -o /tmp/cmake.tar.gz \
+  && tar -xzf /tmp/cmake.tar.gz -C /usr/local --strip-components=1 \
+  && cmake --version \
+  && rm -f /tmp/cmake.tar.gz \
   && rm -rf /var/lib/apt/lists/*
 COPY scripts/install-sortformer.sh ./scripts/install-sortformer.sh
 RUN sh ./scripts/install-sortformer.sh
