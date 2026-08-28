@@ -23,6 +23,10 @@ interface KnowledgeDoc {
   fileSize?: number;
   sha256?: string;
   hasOriginalFile?: boolean;
+  processingStatus?: 'PENDING' | 'PROCESSING' | 'COMPLETE' | 'FAILED' | null;
+  processingError?: string | null;
+  processedPages?: number | null;
+  pageCount?: number | null;
 }
 
 interface KnowledgeBaseProps {
