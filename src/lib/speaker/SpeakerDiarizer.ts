@@ -175,7 +175,8 @@ export class SpeakerDiarizer {
         latencyMs: Date.now() - startedAt,
         source: this.provider.getName().includes('Neural') ? 'DEEP_NEURAL' : 'ACOUSTIC_FALLBACK',
         embeddingModel: this.provider.getModelId(),
-        createCandidate: !hasRegisteredProfiles,
+        createCandidate: true,
+        suppressCandidateIfNearRegistered: hasRegisteredProfiles ? 0.50 : undefined,
         previousSpeakerId: this.currentSpeakerId,
       });
     } catch (error: any) {
