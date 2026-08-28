@@ -136,7 +136,7 @@ export const SpeakerRegistryPanel: React.FC<SpeakerRegistryPanelProps> = ({
         setRecordingCountdown(timeLeft);
         if (timeLeft <= 0) {
           clearInterval(timer);
-          finishSampleRecording();
+          void finishSampleRecording();
         }
       }, 1000);
 
