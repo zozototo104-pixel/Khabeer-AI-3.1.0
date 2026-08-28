@@ -336,10 +336,16 @@ export class SpeakerRecognitionService {
     // of its live PCM segment while inference runs off-thread.
     const copy = new Float32Array(pcmData);
     return new Promise<number[]>((resolve, reject) => {
+      // Render CPU instances can take several seconds for the first ERes2Net
+      // inference while ONNX warms its kernels. 4.5s was aborting otherwise
+      // healthy enrollment requests and surfacing SPEAKER_WORKER_TIMEOUT.
+      // Keep inference isolated in the worker, but allow a realistic cold-start
+      // budget; subsequent requests normally resolve much sooner.
+      const timeoutMs = Math.max(5_000, Number(process.env.SPEAKER_WORKER_TIMEOUT_MS || 15_000));
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error('SPEAKER_WORKER_TIMEOUT'));
-      }, 4500);
+      }, timeoutMs);
       this.pending.set(id, { resolve, reject, timer });
       this.worker!.postMessage({ type: 'embed', id, buffer: copy.buffer, bypassVad: options.bypassVad === true }, [copy.buffer]);
     });
