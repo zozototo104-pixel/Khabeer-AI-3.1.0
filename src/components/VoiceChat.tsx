@@ -1948,7 +1948,8 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
               wsRef.current.send(JSON.stringify({ type: 'speech_start', isCalibration: isCalibrationModeRef.current, duringAiPlayback: isAiPlaying }));
               if (isAiPlaying) {
                 handleBargeIn('USER_BARGE_IN', {
-                  rms, noiseFloor: noiseFloorRef.current, threshold: speechThreshold, frames: vadSpeechFramesRef.current, isAiPlaying: true
+                  rms, noiseFloor: noiseFloorRef.current, threshold: speechThreshold, frames: vadSpeechFramesRef.current, isAiPlaying: true,
+                  peak, crestFactor, ambient: ambientRmsRef.current, nearFieldVoice
                 });
               } else {
                 setConversationState('USER_SPEAKING');
