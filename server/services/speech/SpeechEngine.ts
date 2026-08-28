@@ -228,7 +228,10 @@ export class SpeechEngine {
         if (activeProbe) await activeProbe.catch(() => null);
         let segment: SpeechSegment | null = null;
         try {
-          const regions = await sortformerDiarizationService.diarize(combined);
+          // The accumulated PCM for this speech turn lives in the diarizer;
+          // Sortformer must receive that complete turn, not an undefined local.
+          const turnPcm = diarizer.getBufferedPcm();
+          const regions = await sortformerDiarizationService.diarize(turnPcm);
           const registry = this.getSessionRegistry(sessionId);
           let best: { region: (typeof regions)[number]; embedding: number[]; result: ReturnType<SpeakerRegistry['identifySpeaker']> } | null = null;
           for (const region of regions) {
@@ -236,7 +239,10 @@ export class SpeechEngine {
             for (const window of windows.length ? windows : [region.pcm]) {
               if (window.length < SPEAKER_THRESHOLDS.SAMPLE_RATE) continue;
               const embedding = await this.provider.extractEmbedding(window);
-              const result = registry.identifySpeaker(embedding, `${sessionId}:${region.speaker}`);
+              const result = registry.identifySpeaker(embedding, {
+                source: 'DEEP_NEURAL',
+                embeddingModel: this.provider.getModelId(),
+              });
               if (!best || result.similarity > best.result.similarity) best = { region, embedding, result };
               if (result.identitySource === 'VERIFIED') break;
             }
