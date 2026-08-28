@@ -837,11 +837,24 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
 
   const handleBargeIn = useCallback((
     reason: string = 'USER_BARGE_IN',
-    vadMetrics?: { rms: number; noiseFloor: number; threshold: number; frames: number; isAiPlaying: boolean }
+    vadMetrics?: {
+      rms: number;
+      noiseFloor: number;
+      threshold: number;
+      frames: number;
+      isAiPlaying: boolean;
+      peak?: number;
+      crestFactor?: number;
+      ambient?: number;
+      nearFieldVoice?: boolean;
+    }
   ) => {
     if (sourcesRef.current.length > 0 || audioQueueRef.current.length > 0 || isAiTurnInProgressRef.current) {
       if (vadMetrics) {
-        addDebugLog(`[BARGE_DIAG] reason=${reason} turnId=${currentAiTurnIdRef.current} rms=${vadMetrics.rms.toFixed(5)} threshold=${vadMetrics.threshold.toFixed(5)} noiseFloor=${vadMetrics.noiseFloor.toFixed(5)} frames=${vadMetrics.frames} aiPlaying=${vadMetrics.isAiPlaying} activeSources=${sourcesRef.current.length} queueDepth=${audioQueueRef.current.length}`);
+        const nearFieldDiag = vadMetrics.peak !== undefined
+          ? ` peak=${vadMetrics.peak.toFixed(5)} crest=${(vadMetrics.crestFactor || 0).toFixed(2)} ambient=${(vadMetrics.ambient || 0).toFixed(5)} nearFieldVoice=${vadMetrics.nearFieldVoice === true}`
+          : '';
+        addDebugLog(`[BARGE_DIAG] reason=${reason} turnId=${currentAiTurnIdRef.current} rms=${vadMetrics.rms.toFixed(5)} threshold=${vadMetrics.threshold.toFixed(5)} noiseFloor=${vadMetrics.noiseFloor.toFixed(5)} frames=${vadMetrics.frames} aiPlaying=${vadMetrics.isAiPlaying} activeSources=${sourcesRef.current.length} queueDepth=${audioQueueRef.current.length}${nearFieldDiag}`);
       }
       
       const currentTurn = currentAiTurnIdRef.current;
