@@ -220,7 +220,17 @@ export class SpeakerRecognitionService {
   private runtimeVersion = '';
   private onnxRuntimeVersion = '';
   private requestCounter = 0;
-  private pending = new Map<number, { resolve: (value: number[]) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
+  private pending = new Map<number, {
+    resolve: (value: number[]) => void;
+    reject: (error: Error) => void;
+    timer: NodeJS.Timeout;
+    cleanupTimer?: NodeJS.Timeout;
+    label: string;
+    queuedAt: number;
+    startedAt: number;
+    timeoutMs: number;
+    timedOut?: boolean;
+  }>();
 
   constructor(modelPath?: string) {
     this.modelPath = modelPath ? path.resolve(modelPath) : this.resolveBestModelPath();
