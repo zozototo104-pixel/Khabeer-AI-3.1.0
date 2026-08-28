@@ -4830,6 +4830,7 @@ ${transcript}
       // Decode + validate each sample → extract 512-D embedding via ONNX Worker
       const extractedEmbeddings: number[][] = [];
       const sampleErrors: { index: number; error: string }[] = [];
+      let acceptedAudioSamples = 0;
 
       for (let i = 0; i < samples.length; i++) {
         const s = samples[i];
