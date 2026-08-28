@@ -832,12 +832,25 @@ async function drainKnowledgeProcessingQueue() {
       if (!job) break;
 
       const sourceBuffer = Buffer.isBuffer(job.data) ? job.data : Buffer.from(job.data as any);
-      await db.update(knowledge).set({
+      const claimed = await db.update(knowledge).set({
         processingStatus: 'PROCESSING',
         processingError: null,
         processedPages: 0,
         updatedAt: new Date(),
-      }).where(eq(knowledge.id, job.id));
+      }).where(and(
+        eq(knowledge.id, job.id),
+        or(
+          eq(knowledge.processingStatus, 'PENDING'),
+          and(
+            eq(knowledge.processingStatus, 'PROCESSING'),
+            lt(knowledge.updatedAt, staleProcessingBefore),
+          ),
+        ),
+      )).returning({ id: knowledge.id });
+      if (!claimed.length) {
+        console.log('[KnowledgeWorker:CLAIM_SKIPPED]', { id: job.id, fileName: job.fileName, previousStatus: job.processingStatus });
+        continue;
+      }
 
       console.log('[KnowledgeWorker:START]', {
         id: job.id,
