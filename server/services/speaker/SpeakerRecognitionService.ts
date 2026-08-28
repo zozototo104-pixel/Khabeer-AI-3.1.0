@@ -520,7 +520,7 @@ export class SpeakerRecognitionService {
     };
   }
 
-  public async getEmbedding(pcmData: Float32Array, options: { bypassVad?: boolean } = {}): Promise<number[]> {
+  public async getEmbedding(pcmData: Float32Array, options: { bypassVad?: boolean; label?: string } = {}): Promise<number[]> {
     const quality = AudioFeatures.checkAudioQuality(pcmData);
     if (!quality.isValid) throw new Error(`LOW_AUDIO_QUALITY:${quality.reason}`);
 
@@ -535,22 +535,21 @@ export class SpeakerRecognitionService {
     }
 
     const id = ++this.requestCounter;
+    const label = String(options.label || 'speaker-embedding').replace(/[^a-zA-Z0-9_.:-]/g, '_').slice(0, 96);
     // Copy into an isolated transferable buffer so the caller keeps ownership
     // of its live PCM segment while inference runs off-thread.
     const copy = new Float32Array(pcmData);
     return new Promise<number[]>((resolve, reject) => {
-      // Render CPU instances can take several seconds for the first ERes2Net
-      // inference while ONNX warms its kernels. 4.5s was aborting otherwise
-      // healthy enrollment requests and surfacing SPEAKER_WORKER_TIMEOUT.
-      // Keep inference isolated in the worker, but allow a realistic cold-start
-      // budget; subsequent requests normally resolve much sooner.
-      const timeoutMs = Math.max(5_000, Number(process.env.SPEAKER_WORKER_TIMEOUT_MS || 15_000));
-      const timer = setTimeout(() => {
-        this.pending.delete(id);
-        reject(new Error('SPEAKER_WORKER_TIMEOUT'));
-      }, timeoutMs);
-      this.pending.set(id, { resolve, reject, timer });
-      this.worker!.postMessage({ type: 'embed', id, buffer: copy.buffer, bypassVad: options.bypassVad === true }, [copy.buffer]);
+      this.embeddingQueue.push({
+        id,
+        copy,
+        bypassVad: options.bypassVad === true,
+        label,
+        queuedAt: Date.now(),
+        resolve,
+        reject,
+      });
+      this.dispatchNextEmbedding();
     });
   }
 
