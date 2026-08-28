@@ -147,7 +147,7 @@ export class SpeechEngine {
    * Detects the speaker identity directly from raw PCM audio
    */
   public async detectSpeaker(pcmData: Float32Array, sessionId: string = 'global'): Promise<SpeakerIdentificationResult> {
-    const embedding = await this.provider.extractEmbedding(pcmData);
+    const embedding = await this.provider.extractEmbedding(pcmData, { label: `detect:${sessionId}` });
     const registry = this.getSessionRegistry(sessionId);
     return registry.identifySpeaker(embedding, {
       source: this.provider.getName().includes('Neural') ? 'DEEP_NEURAL' : 'ACOUSTIC_FALLBACK',
