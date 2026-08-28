@@ -194,9 +194,11 @@ parentPort.on('message', (message) => {
     const embedding = extractor.compute(stream);
     metrics.computeMs = nowMs() - computeStartedAt;
     metrics.workerTotalMs = nowMs() - requestStartedAt;
+    metrics.totalInferenceMs = metrics.workerTotalMs;
     parentPort.postMessage({ type: 'result', id, embedding: l2Normalize(embedding), metrics });
   } catch (error) {
     metrics.workerTotalMs = nowMs() - requestStartedAt;
+    metrics.totalInferenceMs = metrics.workerTotalMs;
     parentPort.postMessage({ type: 'error', id, error: error && error.message ? error.message : String(error), metrics });
   }
 });
