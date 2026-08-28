@@ -334,6 +334,8 @@ export class SpeechEngine {
           const turnPcm = diarizer.getBufferedPcm();
           const regions = await sortformerDiarizationService.diarize(turnPcm);
           const registry = this.getSessionRegistry(sessionId);
+          const registeredProfiles = registry.getAllSpeakers().filter((profile) => !profile.isCandidate && profile.status === 'VALID' && profile.embeddingModel === this.provider.getModelId());
+          const createCandidate = registeredProfiles.length === 0;
           const tracks = new Map<string, Float32Array[]>();
           for (const region of regions) {
             if (!region.pcm?.length) continue;
