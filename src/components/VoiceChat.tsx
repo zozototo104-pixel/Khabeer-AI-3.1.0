@@ -1920,12 +1920,17 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
           const warmupBreakthroughThreshold = Math.max(0.180, echoRelativeThreshold * 1.35);
           const playbackWarmupHoldoff = isAiPlaying && aiPlaybackAgeMs < 350 && rms < warmupBreakthroughThreshold;
           const ambientBaseline = Math.max(ambientRmsRef.current, noiseFloorRef.current * 2, 0.008);
-          const nearFieldRms = rms >= Math.max(0.055, ambientBaseline * 2.2);
-          const nearFieldPeak = peak >= Math.max(0.18, ambientBaseline * 6.0);
+          const nearFieldRms = rms >= Math.max(0.070, ambientBaseline * 2.8);
+          const nearFieldPeak = peak >= Math.max(0.26, ambientBaseline * 8.0);
           const nearFieldImpulse = crestFactor >= 3.0;
-          const nearFieldVoice = !playbackWarmupHoldoff && (nearFieldRms || (nearFieldPeak && nearFieldImpulse));
-          const strongBargeIn = isAiPlaying && nearFieldVoice && rms >= Math.max(0.120, echoRelativeThreshold * 1.18);
-          const requiredSpeechFrames = isAiPlaying ? (strongBargeIn ? 5 : 12) : 2;
+          const closeSpeechOnset = nearFieldPeak && (nearFieldImpulse || peak >= 0.48 || rms >= 0.20);
+          const sustainedNearSpeech = nearFieldRms && (crestFactor >= 2.4 || rms >= 0.18);
+          const nearFieldVoice = !playbackWarmupHoldoff && (closeSpeechOnset || sustainedNearSpeech);
+          // Fast interruption needs close/impulsive speech. Medium RMS with low
+          // crest (typical TV/echo/compressed loudspeaker output) must persist
+          // longer before we cut the expert off.
+          const strongBargeIn = isAiPlaying && closeSpeechOnset && rms >= Math.max(0.150, echoRelativeThreshold * 1.25);
+          const requiredSpeechFrames = isAiPlaying ? (strongBargeIn ? 5 : 14) : 2;
           const isCurrentlySpeaking = vadSpeechFramesRef.current >= requiredSpeechFrames;
           const speechThreshold = isAiPlaying
             ? (isCurrentlySpeaking ? stopThreshold : echoRelativeThreshold)
