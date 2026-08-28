@@ -37,6 +37,10 @@ const { parentPort, workerData } = require('node:worker_threads');
 const { createRequire } = require('node:module');
 const path = require('node:path');
 
+function nowMs() {
+  return Number(process.hrtime.bigint()) / 1e6;
+}
+
 function l2Normalize(values) {
   let sum = 0;
   for (let i = 0; i < values.length; i++) sum += values[i] * values[i];
@@ -47,15 +51,23 @@ function l2Normalize(values) {
 
 let extractor = null;
 let vad = null;
+const initStartedAt = nowMs();
 try {
+  const requireStartedAt = nowMs();
   const runtimeRequire = createRequire(path.join(workerData.cwd, 'package.json'));
   const sherpa = runtimeRequire('sherpa-onnx-node');
+  const requireMs = nowMs() - requireStartedAt;
+
+  const extractorStartedAt = nowMs();
   extractor = new sherpa.SpeakerEmbeddingExtractor({
     model: workerData.modelPath,
     numThreads: workerData.numThreads,
     debug: workerData.debug,
     provider: workerData.provider,
   });
+  const extractorInitMs = nowMs() - extractorStartedAt;
+
+  const vadStartedAt = nowMs();
   vad = new sherpa.Vad({
     sileroVad: {
       model: workerData.vadModelPath,
@@ -70,55 +82,122 @@ try {
     debug: false,
     provider: 'cpu',
   }, 20);
+  const vadInitMs = nowMs() - vadStartedAt;
+
   const dim = Number(extractor.dim) || 0;
   if (dim !== 512) throw new Error('UNEXPECTED_EMBEDDING_DIM: got ' + dim + ', expected 512');
-  parentPort.postMessage({ type: 'ready', dim, version: sherpa.version, onnxruntimeVersion: sherpa.onnxruntimeVersion });
+  parentPort.postMessage({
+    type: 'ready',
+    dim,
+    version: sherpa.version,
+    onnxruntimeVersion: sherpa.onnxruntimeVersion,
+    metrics: {
+      workerInitMs: nowMs() - initStartedAt,
+      requireMs,
+      extractorInitMs,
+      vadInitMs,
+    },
+  });
 } catch (error) {
-  parentPort.postMessage({ type: 'init_error', error: error && error.message ? error.message : String(error) });
+  parentPort.postMessage({
+    type: 'init_error',
+    error: error && error.message ? error.message : String(error),
+    metrics: { workerInitMs: nowMs() - initStartedAt },
+  });
 }
 
 function verifiedSpeech(samples) {
   if (!vad) throw new Error('VAD_WORKER_NOT_READY');
+  const vadStartedAt = nowMs();
   vad.reset();
+  let acceptedFrames = 0;
   for (let offset = 0; offset < samples.length; offset += 512) {
     const source = samples.subarray(offset, Math.min(samples.length, offset + 512));
     const frame = source.length === 512 ? source : (() => { const p = new Float32Array(512); p.set(source); return p; })();
     vad.acceptWaveform(frame);
+    acceptedFrames += 1;
   }
-  const active = vad.isDetected();
+  const activeBeforeFlush = vad.isDetected();
+  const flushStartedAt = nowMs();
   vad.flush();
+  const flushMs = nowMs() - flushStartedAt;
   const parts = [];
   let length = 0;
+  let segmentCount = 0;
   while (!vad.isEmpty()) {
     const segment = vad.front();
     const part = Float32Array.from(segment.samples || []);
-    if (part.length) { parts.push(part); length += part.length; }
+    if (part.length) { parts.push(part); length += part.length; segmentCount += 1; }
     vad.pop();
   }
   const merged = new Float32Array(length);
   let cursor = 0;
   for (const part of parts) { merged.set(part, cursor); cursor += part.length; }
-  return { detected: active || length >= 3200, samples: merged };
+  return {
+    detected: activeBeforeFlush || length >= 3200,
+    samples: merged,
+    metrics: {
+      vadMs: nowMs() - vadStartedAt,
+      vadFlushMs: flushMs,
+      vadFrames: acceptedFrames,
+      vadSegments: segmentCount,
+      vadDetected: activeBeforeFlush || length >= 3200,
+      rawSamples: samples.length,
+      vadSamples: merged.length,
+    },
+  };
 }
 
 parentPort.on('message', (message) => {
   if (!message || message.type !== 'embed') return;
   const id = message.id;
+  const requestStartedAt = nowMs();
+  const workerReceivedAt = Date.now();
+  const queuedAt = Number(message.queuedAt) || 0;
+  const startedAt = Number(message.startedAt) || 0;
+  const metrics = {
+    label: String(message.label || 'embedding'),
+    queueWaitMs: queuedAt && startedAt ? startedAt - queuedAt : 0,
+    workerDispatchMs: startedAt ? workerReceivedAt - startedAt : 0,
+    rawSamples: 0,
+    vadSamples: 0,
+    vadBypassed: message.bypassVad === true,
+  };
   try {
     if (!extractor) throw new Error('SPEAKER_WORKER_NOT_READY');
     const rawSamples = new Float32Array(message.buffer);
+    metrics.rawSamples = rawSamples.length;
     const verified = message.bypassVad
-      ? { detected: true, samples: rawSamples }
+      ? { detected: true, samples: rawSamples, metrics: { rawSamples: rawSamples.length, vadSamples: rawSamples.length, vadMs: 0, vadBypassed: true } }
       : verifiedSpeech(rawSamples);
+    Object.assign(metrics, verified.metrics || {});
     if (!verified.detected || verified.samples.length < 8000) throw new Error('NO_VERIFIED_SPEECH');
+
+    const createStreamStartedAt = nowMs();
     const stream = extractor.createStream();
+    metrics.createStreamMs = nowMs() - createStreamStartedAt;
+
+    const acceptStartedAt = nowMs();
     stream.acceptWaveform({ sampleRate: 16000, samples: verified.samples });
+    metrics.acceptWaveformMs = nowMs() - acceptStartedAt;
+
+    const inputFinishedStartedAt = nowMs();
     stream.inputFinished();
-    if (!extractor.isReady(stream)) throw new Error('INSUFFICIENT_AUDIO_FOR_NEURAL_EMBEDDING');
-    const embedding = extractor.compute(stream, false);
-    parentPort.postMessage({ type: 'result', id, embedding: l2Normalize(embedding) });
+    metrics.inputFinishedMs = nowMs() - inputFinishedStartedAt;
+
+    const readyStartedAt = nowMs();
+    const ready = extractor.isReady(stream);
+    metrics.isReadyMs = nowMs() - readyStartedAt;
+    if (!ready) throw new Error('INSUFFICIENT_AUDIO_FOR_NEURAL_EMBEDDING');
+
+    const computeStartedAt = nowMs();
+    const embedding = extractor.compute(stream);
+    metrics.computeMs = nowMs() - computeStartedAt;
+    metrics.workerTotalMs = nowMs() - requestStartedAt;
+    parentPort.postMessage({ type: 'result', id, embedding: l2Normalize(embedding), metrics });
   } catch (error) {
-    parentPort.postMessage({ type: 'error', id, error: error && error.message ? error.message : String(error) });
+    metrics.workerTotalMs = nowMs() - requestStartedAt;
+    parentPort.postMessage({ type: 'error', id, error: error && error.message ? error.message : String(error), metrics });
   }
 });
 `;
