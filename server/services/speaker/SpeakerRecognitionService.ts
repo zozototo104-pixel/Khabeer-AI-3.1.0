@@ -381,11 +381,14 @@ export class SpeakerRecognitionService {
         worker.on('error', (error) => {
           this.loadError = error.message;
           this.neuralAvailable = false;
+          this.workerBusy = false;
           for (const [, pending] of this.pending) {
             clearTimeout(pending.timer);
+            if (pending.cleanupTimer) clearTimeout(pending.cleanupTimer);
             pending.reject(error);
           }
           this.pending.clear();
+          for (const queued of this.embeddingQueue.splice(0)) queued.reject(error);
           if (!this.neuralAvailable) failInit(error.message);
         });
 
