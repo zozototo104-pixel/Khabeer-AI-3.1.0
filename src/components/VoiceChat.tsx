@@ -1871,10 +1871,15 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
           
           // 2. Audio Energy (RMS) & Adaptive Dynamic Noise Floor with Hysteresis
           let sum = 0;
+          let peak = 0;
           for (let i = 0; i < inputData.length; i++) {
-            sum += inputData[i] * inputData[i];
+            const sample = inputData[i];
+            sum += sample * sample;
+            const abs = Math.abs(sample);
+            if (abs > peak) peak = abs;
           }
           const rms = Math.sqrt(sum / inputData.length);
+          const crestFactor = peak / Math.max(rms, 1e-6);
           setLiveRMS(rms);
 
           const isAiPlaying = isSpeaking || sourcesRef.current.length > 0 || audioQueueRef.current.length > 0 || isAiTurnInProgressRef.current;
