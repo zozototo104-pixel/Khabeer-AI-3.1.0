@@ -3843,9 +3843,9 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
             set: {
               fileName,
               mimeType: req.file.mimetype || 'application/octet-stream',
-              fileSize: req.file.buffer.length,
+              fileSize: replacementBuffer.length,
               sha256,
-              data: req.file.buffer,
+              data: replacementBuffer,
               updatedAt: new Date(),
             },
           });
