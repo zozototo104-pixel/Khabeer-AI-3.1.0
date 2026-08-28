@@ -560,6 +560,7 @@ async function extractPdfWithVerifiedOcr(
       ? `[ملاحظة جودة: تم استخراج ${usablePages} من ${pageCount} صفحة. الصفحات التي تحتاج مراجعة الأصل: ${failedPages.join(', ')}${ocrBudgetExhausted ? '. توقفت معالجة OCR عند بلوغ المهلة الآمنة مع الاحتفاظ بكل النص الموثوق المستخرج' : ''}]\n\n`
       : '';
 
+    await onProgress?.({ processedPages: pageCount, pageCount, stage: 'complete' });
     console.log('PDF hybrid OCR completed', { fileName, pageCount, usablePages, failedPages, ocrBudgetExhausted });
     return warning + pageTexts.join('\n\n');
   } finally {
