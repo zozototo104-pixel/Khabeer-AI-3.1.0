@@ -3548,6 +3548,8 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
 
       const originalName = req.file.originalname;
       const mimeType = req.file.mimetype;
+      // Source contract: hash the exact uploaded bytes. This is the disk-backed
+      // equivalent of the previous memory path createHash('sha256').update(req.file.buffer).
       const sha256 = createHash('sha256').update(fileBuffer).digest('hex');
 
       // Large PDFs must not keep the browser upload request open while OCR runs.
