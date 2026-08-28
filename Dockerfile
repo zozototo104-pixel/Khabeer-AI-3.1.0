@@ -56,6 +56,9 @@ RUN npm ci --omit=dev \
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --from=build --chown=node:node /app/models ./models
 COPY --from=build --chown=node:node /app/migrations ./migrations
+COPY --from=sortformer /opt/nemo /opt/nemo
+ENV NEMO_SPEECH_BIN=/opt/nemo/bin/nemo-speech \
+    SORTFORMER_MODEL=/opt/nemo/models/sortformer-v2.q8_0.gguf
 
 USER node
 EXPOSE 3000
