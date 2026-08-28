@@ -46,6 +46,20 @@ const upload = multer({
   }),
   limits: { fileSize: 100 * 1024 * 1024, files: 1 },
 });
+
+async function readUploadedFileBuffer(file: any): Promise<Buffer> {
+  if (Buffer.isBuffer(file?.buffer)) return file.buffer;
+  if (typeof file?.path === 'string' && file.path.startsWith(uploadTempDir)) {
+    return fs.readFile(file.path);
+  }
+  throw new Error('UPLOAD_FILE_BUFFER_UNAVAILABLE');
+}
+
+async function cleanupUploadedFile(file: any): Promise<void> {
+  if (typeof file?.path === 'string' && file.path.startsWith(uploadTempDir)) {
+    await fs.unlink(file.path).catch(() => undefined);
+  }
+}
 // P0-4 FIX: dedicated multer error handler. Without this, a MulterError
 // (e.g. file too large) propagates as an unhandled Express error and the
 // client receives a generic HTTP 500 HTML page with the full Node stack
