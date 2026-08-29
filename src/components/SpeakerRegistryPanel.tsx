@@ -417,9 +417,9 @@ const audioBase64 = btoa(binary);
 
           {/* Profiles Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
-            {profiles.map(p => {
+            {registeredProfiles.map(p => {
               const isActive = activeSpeakerId === p.id;
-              const isCandidate = p.isCandidate;
+              const isCandidate = false;
               return (
                 <div
                   key={p.id}
