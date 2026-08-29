@@ -1081,6 +1081,28 @@ let lastInjectedSpeakerTurnId = -1;
       return name.length >= 2 ? name.slice(0, 80) : '';
     };
 
+    const isSelfIdentityQuestion = (text: string): boolean => {
+      const value = String(text || '')
+        .replace(/[؟?!.،,]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return /(?:من\s+انا|من\s+أنا|مين\s+انا|مين\s+أنا|تعرفني|عرفتني|هل\s+تعرف\s+من\s+انا|هل\s+تعرف\s+من\s+أنا)/i.test(value);
+    };
+
+    const injectAuthoritativeIdentityAnswerIfNeeded = () => {
+      if (!activeLiveSession || identityAnswerInjectedTurnId === liveTurnSequence) return;
+      if (activeSpeakerAttribution.identitySource === 'VERIFIED' && activeSpeakerAttribution.speakerName && activeSpeakerAttribution.speakerName !== 'متحدث غير معروف') {
+        identityAnswerInjectedTurnId = liveTurnSequence;
+        sendLiveText(activeLiveSession, `[إجابة نظام إلزامية على سؤال الهوية: آخر تحقق صوتي عصبي مؤكد في هذه الجلسة هو: ${activeSpeakerAttribution.speakerName}، بنسبة ${Math.round((activeSpeakerAttribution.speakerConfidence || 0) * 100)}%. إذا سأل المستخدم "من أنا؟" فأجب مباشرة: "أنت ${activeSpeakerAttribution.speakerName} حسب البصمة الصوتية الموثقة الآن." لا تقل إن البصمة غير مسجلة ولا تعتمد على الذاكرة.]`);
+        console.log('[SpeakerIdentity] Injected authoritative verified identity answer', {
+          turn: liveTurnSequence,
+          speakerId: activeSpeakerAttribution.speakerId,
+          speakerName: activeSpeakerAttribution.speakerName,
+          confidence: activeSpeakerAttribution.speakerConfidence,
+        });
+      }
+    };
+
     let transcriptFlushQueue: Promise<void> = Promise.resolve();
     const flushPendingTranscripts = (): Promise<void> => {
       if (!dbSessionId) return transcriptFlushQueue;
