@@ -94,7 +94,7 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
   const fetchDocuments = async () => {
     setIsLoading(true);
     try {
-      const activeToken = propToken || await getAuthToken();
+      const activeToken = await getAuthToken() || propToken;
       if (!activeToken) {
         setIsLoading(false);
         return;
