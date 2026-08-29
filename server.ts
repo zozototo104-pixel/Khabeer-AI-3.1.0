@@ -1185,6 +1185,8 @@ let lastInjectedSpeakerTurnId = -1;
         return;
       }
 
+      maybePromptCandidateEnrollment(diagResult, phase);
+
       if (diagResult.identitySource === 'VERIFIED') {
         activeSpeakerAttribution = {
           speakerId: diagResult.speakerId || null,
