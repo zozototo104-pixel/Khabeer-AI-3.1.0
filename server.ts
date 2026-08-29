@@ -1090,6 +1090,8 @@ async function startServer() {
     let lastInjectedVerifiedSpeakerId = '';
     let lastInjectedVerifiedSpeakerAt = 0;
     let speakerContextVersion = 0;
+    let liveAssistantTurnOpen = false;
+    let pendingLiveContext: { text: string; reason: string; queuedAt: number } | null = null;
     let activeSpeakerAttribution: {
       speakerId: string | null;
       speakerName: string;
