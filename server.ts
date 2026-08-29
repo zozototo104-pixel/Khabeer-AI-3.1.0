@@ -2289,15 +2289,19 @@ ${liveKnowledgeContext}`;
                 await publishSpeakerResult(diagResult, Boolean(msg.isCalibration), 'FINAL');
                 if (!guestConnection
                   && pendingSelfIdentifiedName
+                  && pendingEnrollmentCandidateId
                   && diagResult.identitySource === 'CANDIDATE'
-                  && diagResult.speakerId
+                  && diagResult.speakerId === pendingEnrollmentCandidateId
                   && dbSessionId) {
                   const promoted = speechEngine.promoteCandidate(
-                    diagResult.speakerId,
+                    pendingEnrollmentCandidateId,
                     pendingSelfIdentifiedName,
                     String(dbSessionId),
                   );
+                  const completedCandidateId = pendingEnrollmentCandidateId;
                   pendingSelfIdentifiedName = '';
+                  pendingEnrollmentCandidateId = '';
+                  candidateEnrollmentEvidence.delete(completedCandidateId);
                   if (promoted) {
                     activeSpeakerAttribution = {
                       speakerId: promoted.id,
