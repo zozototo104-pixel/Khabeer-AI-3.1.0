@@ -1973,11 +1973,15 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
           // Fast interruption needs close/impulsive speech. Medium RMS with low
           // crest (typical TV/echo/compressed loudspeaker output) must persist
           // longer before we cut the expert off.
-          const strongBargeIn = isAiPlaying && closeSpeechOnset && rms >= Math.max(0.170, echoRelativeThreshold * 1.35);
+          const impulsiveNearFieldEvidence = crestFactor >= 2.85 || peak >= 0.72;
+          const strongBargeIn = isAiPlaying
+            && closeSpeechOnset
+            && impulsiveNearFieldEvidence
+            && rms >= Math.max(0.170, echoRelativeThreshold * 1.35);
           // A single sharp TV/transient or the expert's own loudspeaker echo can
           // look like near-field speech on iPhone/Safari. Do not stop playback
-          // unless the signal is sustained. This trades ~0.5s extra barge-in
-          // latency for eliminating unexplained expert silence.
+          // unless the signal is sustained. Low-crest, high-RMS audio is typical
+          // loudspeaker echo/compressed media, so it must use the slower path.
           const requiredSpeechFrames = isAiPlaying ? (strongBargeIn ? 14 : 24) : 2;
           const isCurrentlySpeaking = vadSpeechFramesRef.current >= requiredSpeechFrames;
           const speechThreshold = isAiPlaying
