@@ -976,11 +976,10 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
     // If no session exists yet, create one first
     if (!currentSid) {
       try {
-        const createRes = await fetch('/api/sessions', {
+        const createRes = await authedFetch('/api/sessions', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${activeToken}`
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify({ 
             title: trimmedText.substring(0, 35) + (trimmedText.length > 35 ? '...' : '') 
