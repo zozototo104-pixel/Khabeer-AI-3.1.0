@@ -54,6 +54,7 @@ export const SpeakerRegistryPanel: React.FC<SpeakerRegistryPanelProps> = ({
   const sampleProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const recordedChunksRef = useRef<Float32Array[]>([]);
   const recordingSampleRateRef = useRef(16000);
+  const registeredProfiles = profiles.filter((profile) => !profile.isCandidate);
 
   // iOS/Safari may ignore AudioContext({ sampleRate: 16000 }) and capture at
   // the hardware rate (typically 44.1/48 kHz). The server embedding model is
