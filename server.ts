@@ -1882,7 +1882,7 @@ ${liveKnowledgeContext}`;
             model: process.env.GEMINI_LIVE_MODEL || "gemini-3.1-flash-live-preview",
             config: {
               responseModalities: [Modality.AUDIO],
-              maxOutputTokens: 384,
+              maxOutputTokens: Number.parseInt(process.env.GEMINI_LIVE_MAX_OUTPUT_TOKENS || '768', 10),
               temperature: 0.45,
               speechConfig: {
                 voiceConfig: { prebuiltVoiceConfig: { voiceName: msg.voiceName || "Zephyr" } },
