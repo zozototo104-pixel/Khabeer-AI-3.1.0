@@ -399,7 +399,7 @@ const audioBase64 = btoa(binary);
               >
                 تلقائي (التعرف البيومتري)
               </button>
-              {profiles.map(p => (
+              {registeredProfiles.map(p => (
                 <button
                   key={p.id}
                   onClick={() => onSelectSpeakerOverride(p.id)}
