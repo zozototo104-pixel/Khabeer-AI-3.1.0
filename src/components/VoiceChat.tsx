@@ -1324,6 +1324,7 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
         queueDepthAtReceive: audioQueueRef.current.length,
         sequence: seq,
         networkTransitMs,
+        clientReceiveTimestamp: now,
         decodedAt: now
       }
     });
