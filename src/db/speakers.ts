@@ -127,7 +127,7 @@ export async function getPersistentSpeakerProfiles(ownerId: string): Promise<Per
   // ALL stored profiles are returned (no deletion), but each carries a
   // `matchEligible` flag + `ineligibleReason` so callers can decide
   // whether to load them into the active matching registry.
-  return rows.map((row) => {
+  const profiles = rows.map((row) => {
     const base: SpeakerProfile = {
       id: row.speakerId,
       name: row.name,
@@ -145,6 +145,16 @@ export async function getPersistentSpeakerProfiles(ownerId: string): Promise<Per
     const classification = classifyMatchEligibility(base);
     return { ...base, ...classification };
   });
+  const deduped = mergeDuplicateProfilesByName(profiles);
+  if (deduped.length !== profiles.length) {
+    console.log('[SpeakerDB] Deduped persistent speaker profiles by name', {
+      ownerId,
+      before: profiles.length,
+      after: deduped.length,
+      names: deduped.map((profile) => profile.name),
+    });
+  }
+  return deduped;
 }
 
 export async function replacePersistentSpeakerProfiles(ownerId: string, profiles: SpeakerProfile[]): Promise<void> {
