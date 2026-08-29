@@ -2192,10 +2192,15 @@ ${liveKnowledgeContext}`;
           }
         } else if (msg.type === 'speech_start') {
           const sid = dbSessionId ? String(dbSessionId) : 'global';
+          const resumedPendingFinalization = Boolean(pendingSpeechEndTimer);
           if (pendingSpeechEndTimer) {
             clearTimeout(pendingSpeechEndTimer);
             pendingSpeechEndTimer = null;
             console.log('[VoiceWS] Cancelled pending speech_end finalization because speech resumed', { sid, turn: liveTurnSequence });
+          }
+          if (resumedPendingFinalization) {
+            console.log('[VoiceWS] Continuing existing speech segment after brief pause', { sid, turn: liveTurnSequence });
+            return;
           }
           lastSpeakerTask = null;
           pendingSelfIdentifiedName = '';
