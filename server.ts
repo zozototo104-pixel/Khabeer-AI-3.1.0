@@ -2286,6 +2286,10 @@ ${liveKnowledgeContext}`;
                 const outputTranscription = (message.serverContent as any)?.outputTranscription?.text;
                 let textParts = "";
                 if (modelTurn && modelTurn.parts) {
+                  const hasAudioPart = modelTurn.parts.some((p: any) => p.inlineData || p.inline_data);
+                  if (hasAudioPart) {
+                    liveAssistantTurnOpen = true;
+                  }
                   textParts = modelTurn.parts.filter(p => p.text).map(p => p.text).join("");
                 }
                 if (outputTranscription) {
