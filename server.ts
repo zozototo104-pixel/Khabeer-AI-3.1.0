@@ -200,6 +200,64 @@ function sendLiveContext(session: any, text: string): void {
 
 // Centralized resilient model caller. Once a model succeeds it is tried first
 // for the same fallback set, avoiding repeated slow failures on every request.
+function shouldUseExternalExpertKnowledge(question: string): boolean {
+  const text = String(question || '').trim();
+  if (!text) return false;
+  const generalExpertNeed = /(هندس|معمار|قانون|نظام|كود|معيار|اشتراط|تصميم|بناء|إنشاء|انشاء|مخطط|مواصفات|سلامة|مالية|محاسبة|ضريبة|مخاطر|حوكمة|امتثال|أفضل\s+ممارسة|افضل\s+ممارسة|حديث|محدث|ابحث|الانترنت|الويب)/i.test(text);
+  const asksOpinionOrSynthesis = /(ما\s+رأيك|شو\s+رأيك|حلل|قيّم|قيم|اقترح|أوصي|اوصي|هل\s+يجوز|هل\s+يمكن|كيف|ما\s+هي|ما\s+هو|لو\s+قمنا|نريد\s+أن|نريد\s+ان)/i.test(text);
+  return generalExpertNeed && asksOpinionOrSynthesis;
+}
+
+function extractGeminiGroundingSources(response: any): Array<{ title: string; uri: string }> {
+  const candidates = Array.isArray(response?.candidates) ? response.candidates : [];
+  const chunks = candidates.flatMap((candidate: any) => {
+    const metadata = candidate?.groundingMetadata || candidate?.grounding_metadata;
+    return Array.isArray(metadata?.groundingChunks || metadata?.grounding_chunks)
+      ? (metadata.groundingChunks || metadata.grounding_chunks)
+      : [];
+  });
+  const sources: Array<{ title: string; uri: string }> = [];
+  const seen = new Set<string>();
+  for (const chunk of chunks) {
+    const web = chunk?.web || chunk?.retrievedContext || chunk?.retrieved_context;
+    const uri = String(web?.uri || '').trim();
+    if (!uri || seen.has(uri)) continue;
+    seen.add(uri);
+    sources.push({ title: String(web?.title || uri).slice(0, 180), uri });
+    if (sources.length >= 6) break;
+  }
+  return sources;
+}
+
+async function buildExternalExpertKnowledgeContext(question: string, params: { expertHint?: string; internalEvidence?: string } = {}): Promise<string> {
+  const query = String(question || '').trim().slice(0, 900);
+  if (!query) return '';
+  try {
+    const response = await callGeminiWithResilience(ai, {
+      contents: [{
+        role: 'user',
+        parts: [{
+          text: `ابحث في الويب كمصدر عام مساعد فقط، وليس بديلاً عن لوائح المؤسسة.\nالتخصص المطلوب: ${params.expertHint || 'خبير مؤسسي متعدد التخصصات'}\nالسؤال: ${query}\n\nأعد خلاصة عربية مهنية قصيرة ومنظمة. لا تعطِ حكماً نهائياً يخالف اللوائح الداخلية. ركز على مبادئ عامة، معايير، اشتراطات، ومخاطر تحقق. إذا كانت المعلومة قانونية/هندسية محلية وتتطلب جهة اختصاص، اذكر ضرورة التحقق من الكود/البلدية/الجهة الرسمية المختصة.`
+        }]
+      }],
+      config: {
+        temperature: 0.2,
+        tools: [{ googleSearch: {} }],
+      },
+    }, ['gemini-3.7-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest']);
+    const text = String(response?.text || '').trim();
+    const sources = extractGeminiGroundingSources(response);
+    const sourceText = sources.length
+      ? `\n\nمصادر ويب مرجعية مسترجعة:\n${sources.map((source, index) => `${index + 1}. ${source.title} — ${source.uri}`).join('\n')}`
+      : '';
+    if (!text && !sourceText) return '';
+    return `=== معرفة ويب عامة مساعدة ومؤقتة (ليست بديلاً عن اللوائح الداخلية) ===\n${text}${sourceText}\n\nتعليمات الدمج: إذا تعارضت هذه المعرفة العامة مع قاعدة المعرفة الداخلية أو اللوائح المرفوعة، فالأولوية للداخلية. افصل في الجواب بين: (أ) حسب ملفاتك الداخلية، (ب) من الناحية العامة/الهندسية/القانونية، (ج) التوصية العملية.`;
+  } catch (error: any) {
+    console.warn('[ExternalKnowledge] grounding failed:', error?.message || error);
+    return '';
+  }
+}
+
 async function callGeminiWithResilience(
   aiClient: GoogleGenAI,
   requestParams: { contents: any; config?: any },
