@@ -525,6 +525,117 @@ export class RAGEngine {
     return value;
   }
 
+  private normalizeForSearch(text: string): string {
+    return normalizeArabicDigits(String(text || ''))
+      .replace(/[\u064B-\u065F\u0670]/g, '')
+      .replace(/[إأآا]/g, 'ا')
+      .replace(/ى/g, 'ي')
+      .replace(/ة/g, 'ه')
+      .replace(/ؤ/g, 'و')
+      .replace(/ئ/g, 'ي')
+      .toLowerCase();
+  }
+
+  private searchTerms(query: string): string[] {
+    const stop = new Set(['ماذا', 'كيف', 'تنص', 'عن', 'في', 'من', 'ما', 'هو', 'هي', 'هل', 'على', 'الى', 'إلى', 'الي', 'يوجد', 'موجود', 'ذكر', 'بخصوص', 'اريد', 'اعطني', 'شو', 'ايش', 'ايات', 'اللائحه', 'اللائحة', 'النظام', 'قاعدة', 'المعرفه', 'المعرفة']);
+    return Array.from(new Set(this.normalizeForSearch(query).split(/[^\u0621-\u064A0-9]+/).filter((term) => term.length > 2 && !stop.has(term))));
+  }
+
+  private splitEvidenceChunks(doc: KnowledgeDocument): Array<{ text: string; title: string; page?: string }> {
+    const content = doc.content || '';
+    const title = doc.title || 'مستند مرجعي';
+    const pageBlocks = content.split(/(?=\[\[الصفحة\s*\d+\]\])/g).filter((block) => block.trim().length > 0);
+    const sourceBlocks = pageBlocks.length > 1 ? pageBlocks : content.split(/(?=\n\s*(?:#{1,3}\s*)?(?:المادة|مادة|البند|الفصل|الفرع|جدول|الملحق|ملحق)\s*(?:\d+|[٠-٩]+|[\u0621-\u064A]))/g);
+    const chunks: Array<{ text: string; title: string; page?: string }> = [];
+    for (const block of sourceBlocks) {
+      const pageMatch = block.match(/\[\[الصفحة\s*(\d+)\]\]/);
+      const page = pageMatch?.[1];
+      const cleaned = block.trim();
+      if (cleaned.length < 40) continue;
+      if (cleaned.length <= 2200) {
+        chunks.push({ text: cleaned, title, page });
+        continue;
+      }
+      for (let offset = 0; offset < cleaned.length; offset += 1700) {
+        const slice = cleaned.slice(offset, offset + 2200).trim();
+        if (slice.length >= 120) chunks.push({ text: slice, title, page });
+      }
+    }
+    return chunks;
+  }
+
+  private isOverviewQuery(query: string): boolean {
+    return /(?:شو|ماذا|ما)\s+(?:موجود|يوجد|تحتوي|داخل)|(?:لخص|اعطني\s+ملخص|اهم\s+البنود|الفهرس|فهرس|محتويات\s+اللائحه|محتويات\s+اللائحة)/i.test(query);
+  }
+
+  private buildOverviewEvidence(docs: KnowledgeDocument[], maxChars: number): string {
+    const parts: string[] = [];
+    for (const doc of docs.slice(0, 12)) {
+      const title = doc.title || 'لائحة تنظيمية';
+      const content = doc.content || '';
+      const articleMatches = content.match(/(?:المادة|مادة|البند)\s*[\(\[]?\s*(?:\d+|[٠-٩]+|[^\n:–\-]{1,30})[\]\)]?\s*[:–\-]?[^\n]{0,140}/gi) || [];
+      const annexMatches = content.match(/(?:ملحق|الملحق|جدول|الجدول|استمارة|الاستمارة|نموذج|النموذج|مخالفات|عقوبات)\s*[\(\[]?\s*(?:\d+|[٠-٩]+|[^\n:–\-]{1,30})[\]\)]?\s*[:–\-]?[^\n]{0,160}/gi) || [];
+      const intro = content.replace(/\s+/g, ' ').slice(0, 900);
+      parts.push(`📚 [${title}]\nنبذة: ${intro}\nفهرس مواد ظاهر:\n${articleMatches.slice(0, 35).map((x) => `• ${x.trim()}`).join('\n') || 'لا توجد عناوين مواد واضحة في النص المستخرج.'}\n${annexMatches.length ? `ملاحق/جداول/مخالفات:\n${annexMatches.slice(0, 20).map((x) => `• ${x.trim()}`).join('\n')}` : ''}`);
+      if (parts.join('\n\n---\n\n').length >= maxChars) break;
+    }
+    return parts.join('\n\n---\n\n').slice(0, maxChars);
+  }
+
+  /**
+   * Live-safe legal/regulation retrieval: scans full extracted documents but
+   * returns compact, source-labelled evidence chunks instead of dumping whole
+   * PDFs into Gemini Live. This follows legal RAG practice: hybrid lexical
+   * retrieval over structure-aware chunks, source labels, and conservative output.
+   */
+  async searchLiveRegulationEvidence(query: string, organizationId: number, maxChars: number = 18000): Promise<string> {
+    const docs = await this.getDocuments(organizationId);
+    if (!docs.length) return 'لا توجد مستندات أو لوائح معالجة بنجاح في قاعدة المعرفة لهذه المؤسسة.';
+
+    if (this.isOverviewQuery(query)) {
+      return `تعليمات إلزامية: أجب من الفهرس والأدلة التالية فقط، واذكر أسماء الوثائق. إذا احتاج المستخدم مادة محددة فاطلب رقمها أو موضوعها ثم استدع البحث مرة أخرى.\n\n${this.buildOverviewEvidence(docs, maxChars)}`;
+    }
+
+    const specificMatches = await this.findSpecificArticleOrClause(query, organizationId, docs);
+    const terms = this.searchTerms(query);
+    const normalizedQuery = this.normalizeForSearch(query);
+    const scored: Array<{ chunk: { text: string; title: string; page?: string }; score: number }> = [];
+
+    for (const doc of docs) {
+      for (const chunk of this.splitEvidenceChunks(doc)) {
+        const norm = this.normalizeForSearch(`${chunk.title}\n${chunk.text}`);
+        let score = 0;
+        if (normalizedQuery.length > 6 && norm.includes(normalizedQuery)) score += 20;
+        for (const term of terms) {
+          if (norm.includes(term)) score += 4;
+          if (this.normalizeForSearch(chunk.title).includes(term)) score += 3;
+        }
+        const targetNum = normalizeArabicDigits(query).match(/(?:المادة|مادة|البند|ملحق|الملحق|جدول|رقم)\s*(\d+)/)?.[1] || parseArabicSpelledNumber(query);
+        if (targetNum && new RegExp(`(?:المادة|مادة|البند|ملحق|الملحق|جدول)\\s*[\\(\\[]?\\s*${targetNum}(?:\\D|$)`, 'i').test(normalizeArabicDigits(chunk.text))) score += 15;
+        if (/(?:مخالفة|مخالفات|عقوبة|عقوبات|جزاء|جزاءات|خطر|مخاطر|تدقيق|تفتيش|وقف|اعتماد|صلاحيات|اجراءات|إجراءات)/i.test(chunk.text)) score += 1;
+        if (score > 0) scored.push({ chunk, score });
+      }
+    }
+
+    scored.sort((a, b) => b.score - a.score);
+    const evidence: string[] = [];
+    if (specificMatches.length) evidence.push(...specificMatches.slice(0, 4));
+    for (const item of scored.slice(0, 10)) {
+      const pageLabel = item.chunk.page ? `، الصفحة ${item.chunk.page}` : '';
+      const snippet = item.chunk.text.length > 2600 ? `${item.chunk.text.slice(0, 2600)}\n…` : item.chunk.text;
+      if (!evidence.some((existing) => existing.includes(snippet.slice(0, 120)))) {
+        evidence.push(`📌 [دليل مسترجع من: ${item.chunk.title}${pageLabel} | score=${item.score}]\n${snippet}`);
+      }
+      if (evidence.join('\n\n---\n\n').length >= maxChars) break;
+    }
+
+    if (!evidence.length) {
+      return `لم أجد دليلاً مطابقاً للسؤال (${query}) في نصوص اللوائح المعالجة. أجب للمستخدم بذلك بوضوح ولا تخترع نصاً.`;
+    }
+
+    return `تعليمات إلزامية: أجب فقط من الأدلة المسترجعة أدناه. اذكر الوثيقة/الصفحة عند توفرها. إذا كان السؤال عن مخالفة، صنّفها كاشتباه مخالفة فقط عند وجود نص صريح في الأدلة.\n\n${evidence.join('\n\n---\n\n').slice(0, maxChars)}`;
+  }
+
   async buildPromptContext(query: string, organizationId: number, maxChars: number = 100000): Promise<string> {
     const docs = await this.searchCompanyDocuments(query, organizationId, maxChars);
     return docs.join('\n\n---\n\n');
