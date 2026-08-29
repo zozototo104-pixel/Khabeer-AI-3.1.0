@@ -1093,7 +1093,7 @@ let lastInjectedSpeakerTurnId = -1;
       if (!activeLiveSession || identityAnswerInjectedTurnId === liveTurnSequence) return;
       if (activeSpeakerAttribution.identitySource === 'VERIFIED' && activeSpeakerAttribution.speakerName && activeSpeakerAttribution.speakerName !== 'متحدث غير معروف') {
         identityAnswerInjectedTurnId = liveTurnSequence;
-        sendLiveText(activeLiveSession, `[إجابة نظام إلزامية على سؤال الهوية: آخر تحقق صوتي عصبي مؤكد في هذه الجلسة هو: ${activeSpeakerAttribution.speakerName}، بنسبة ${Math.round((activeSpeakerAttribution.speakerConfidence || 0) * 100)}%. إذا سأل المستخدم "من أنا؟" فأجب مباشرة: "أنت ${activeSpeakerAttribution.speakerName} حسب البصمة الصوتية الموثقة الآن." لا تقل إن البصمة غير مسجلة ولا تعتمد على الذاكرة.]`);
+        sendLiveContext(activeLiveSession, `[بيانات وصفية للنظام - سؤال هوية حالي: آخر تحقق صوتي عصبي مؤكد في هذه الجلسة هو: ${activeSpeakerAttribution.speakerName}، بنسبة ${Math.round((activeSpeakerAttribution.speakerConfidence || 0) * 100)}%. إذا سأل المستخدم "من أنا؟" فأجب مباشرة: "أنت ${activeSpeakerAttribution.speakerName} حسب البصمة الصوتية الموثقة الآن." لا تقل إن البصمة غير مسجلة ولا تعتمد على الذاكرة.]`);
         console.log('[SpeakerIdentity] Injected authoritative verified identity answer', {
           turn: liveTurnSequence,
           speakerId: activeSpeakerAttribution.speakerId,
