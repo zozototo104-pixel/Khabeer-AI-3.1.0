@@ -11,8 +11,10 @@ test('microphone frames are gated during AI playback until sustained barge-in is
   assert.doesNotMatch(voice, /Zero-latency Immediate Audio Dispatch/);
 });
 
-test('playback uses adaptive jitter warmup and unity output gain', () => {
-  assert.match(voice, /const warmupMs = Math\.max\(70, Math\.min\(160, adaptiveLookaheadMs \+ 50\)\)/);
+test('playback uses adaptive jitter buffer and unity output gain', () => {
+  assert.match(voice, /const queuedAudioMs = audioQueueRef\.current\.reduce/);
+  assert.match(voice, /const targetBufferMs = recoveringFromStarvation/);
+  assert.match(voice, /\[JITTER_BUFFER_TIMEOUT\]/);
   assert.match(voice, /playbackWarmupReadyRef/);
   assert.match(voice, /gainNode\.gain\.value = 1\.0/);
 });
