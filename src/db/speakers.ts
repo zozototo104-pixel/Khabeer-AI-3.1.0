@@ -16,6 +16,70 @@ function asTimestamp(value?: number): Date | null {
 // competing with 512-D ERes2Net vectors.
 const ACTIVE_NEURAL_MODEL_ID = 'sherpa-onnx/3dspeaker-eres2net-base-16k@1a331345f048';
 const REQUIRED_EMBEDDING_DIM = 512;
+const MAX_PERSISTED_GALLERY = 8;
+
+function normalizeSpeakerNameForDedupe(name: string): string {
+  return String(name || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[إأآا]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .toLowerCase();
+}
+
+function l2NormalizeVector(vector: number[]): number[] {
+  let norm = 0;
+  for (const value of vector) norm += value * value;
+  norm = Math.sqrt(norm);
+  if (!Number.isFinite(norm) || norm <= 1e-12) return vector.slice();
+  return vector.map((value) => value / norm);
+}
+
+function centroidOfEmbeddings(embeddings: number[][]): number[] {
+  const valid = embeddings.filter((embedding) => Array.isArray(embedding) && embedding.length === REQUIRED_EMBEDDING_DIM);
+  if (!valid.length) return [];
+  const centroid = new Array(REQUIRED_EMBEDDING_DIM).fill(0);
+  for (const embedding of valid) {
+    for (let i = 0; i < REQUIRED_EMBEDDING_DIM; i++) centroid[i] += embedding[i];
+  }
+  for (let i = 0; i < REQUIRED_EMBEDDING_DIM; i++) centroid[i] /= valid.length;
+  return l2NormalizeVector(centroid);
+}
+
+function mergeDuplicateProfilesByName(profiles: PersistentSpeakerProfile[]): PersistentSpeakerProfile[] {
+  const byName = new Map<string, PersistentSpeakerProfile>();
+  for (const profile of profiles) {
+    const key = normalizeSpeakerNameForDedupe(profile.name);
+    if (!key) continue;
+    const current = byName.get(key);
+    if (!current) {
+      byName.set(key, profile);
+      continue;
+    }
+    const embeddings = [
+      ...(Array.isArray(current.embeddings) ? current.embeddings : []),
+      ...(Array.isArray(profile.embeddings) ? profile.embeddings : []),
+    ].filter((embedding) => Array.isArray(embedding) && embedding.length === REQUIRED_EMBEDDING_DIM).slice(-MAX_PERSISTED_GALLERY);
+    const newest = (profile.updatedAt || 0) >= (current.updatedAt || 0) ? profile : current;
+    const mergedBase: SpeakerProfile = {
+      ...newest,
+      name: newest.name,
+      embeddings,
+      centroidEmbedding: centroidOfEmbeddings(embeddings),
+      sampleCount: Math.max(current.sampleCount || 0, profile.sampleCount || 0, embeddings.length),
+      confidence: Math.max(current.confidence || 0, profile.confidence || 0),
+      isCandidate: false,
+      status: 'VALID',
+      createdAt: Math.min(current.createdAt || Date.now(), profile.createdAt || Date.now()),
+      updatedAt: Math.max(current.updatedAt || 0, profile.updatedAt || 0),
+      lastSeenAt: Math.max(current.lastSeenAt || 0, profile.lastSeenAt || 0) || undefined,
+      embeddingModel: ACTIVE_NEURAL_MODEL_ID,
+    };
+    byName.set(key, { ...mergedBase, ...classifyMatchEligibility(mergedBase) });
+  }
+  return Array.from(byName.values());
+}
 
 export interface PersistentSpeakerProfile extends SpeakerProfile {
   matchEligible: boolean;
