@@ -1092,11 +1092,36 @@ let lastInjectedSpeakerTurnId = -1;
       return /(?:من\s+انا|من\s+أنا|مين\s+انا|مين\s+أنا|تعرفني|عرفتني|هل\s+تعرف\s+من\s+انا|هل\s+تعرف\s+من\s+أنا)/i.test(value);
     };
 
+    const injectVerifiedSpeakerHandoffContext = (reason: string, phase: 'PROBE' | 'FINAL' | 'IDENTITY_QUESTION' = 'PROBE') => {
+      if (!activeLiveSession) return;
+      if (activeSpeakerAttribution.identitySource !== 'VERIFIED' || !activeSpeakerAttribution.speakerId || !activeSpeakerAttribution.speakerName || activeSpeakerAttribution.speakerName === 'متحدث غير معروف') return;
+      const now = Date.now();
+      const speakerChanged = lastInjectedVerifiedSpeakerId !== activeSpeakerAttribution.speakerId;
+      const stale = now - lastInjectedVerifiedSpeakerAt > 8_000;
+      if (!speakerChanged && !stale && phase !== 'IDENTITY_QUESTION') return;
+      speakerContextVersion += 1;
+      lastInjectedVerifiedSpeakerId = activeSpeakerAttribution.speakerId;
+      lastInjectedVerifiedSpeakerAt = now;
+      const confidencePct = Math.round((activeSpeakerAttribution.speakerConfidence || 0) * 100);
+      sendLiveContext(activeLiveSession, `[بيانات وصفية إلزامية للنظام - SPEAKER_HANDOFF v${speakerContextVersion}: المتحدث الحالي الآن هو ${activeSpeakerAttribution.speakerName} (id=${activeSpeakerAttribution.speakerId}) حسب البصمة الصوتية العصبية الموثقة، الثقة ${confidencePct}%. من هذه اللحظة خاطب هذا المتحدث باسمه الحالي فقط، ولا تستخدم اسم المتحدث السابق. إذا سألك "من أنا؟" فأجب: "أنت ${activeSpeakerAttribution.speakerName} حسب البصمة الصوتية الموثقة الآن." لا تقل إن البصمة غير مسجلة ما دامت هذه الرسالة VERIFIED.]`);
+      console.log('[SpeakerHandoff] Injected verified speaker context', {
+        reason,
+        phase,
+        turn: liveTurnSequence,
+        speakerId: activeSpeakerAttribution.speakerId,
+        speakerName: activeSpeakerAttribution.speakerName,
+        confidence: activeSpeakerAttribution.speakerConfidence,
+        version: speakerContextVersion,
+        speakerChanged,
+        stale,
+      });
+    };
+
     const injectAuthoritativeIdentityAnswerIfNeeded = () => {
-      if (!activeLiveSession || identityAnswerInjectedTurnId === liveTurnSequence) return;
+      if (identityAnswerInjectedTurnId === liveTurnSequence) return;
       if (activeSpeakerAttribution.identitySource === 'VERIFIED' && activeSpeakerAttribution.speakerName && activeSpeakerAttribution.speakerName !== 'متحدث غير معروف') {
         identityAnswerInjectedTurnId = liveTurnSequence;
-        sendLiveContext(activeLiveSession, `[بيانات وصفية للنظام - سؤال هوية حالي: آخر تحقق صوتي عصبي مؤكد في هذه الجلسة هو: ${activeSpeakerAttribution.speakerName}، بنسبة ${Math.round((activeSpeakerAttribution.speakerConfidence || 0) * 100)}%. إذا سأل المستخدم "من أنا؟" فأجب مباشرة: "أنت ${activeSpeakerAttribution.speakerName} حسب البصمة الصوتية الموثقة الآن." لا تقل إن البصمة غير مسجلة ولا تعتمد على الذاكرة.]`);
+        injectVerifiedSpeakerHandoffContext('SELF_IDENTITY_QUESTION', 'IDENTITY_QUESTION');
         console.log('[SpeakerIdentity] Injected authoritative verified identity answer', {
           turn: liveTurnSequence,
           speakerId: activeSpeakerAttribution.speakerId,
