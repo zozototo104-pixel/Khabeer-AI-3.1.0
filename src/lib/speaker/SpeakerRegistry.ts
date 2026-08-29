@@ -342,6 +342,9 @@ if (!isCandidate) {
         ? SPEAKER_THRESHOLDS.CANDIDATE_MATCH_THRESHOLD
         : SPEAKER_THRESHOLDS.SAME_SPEAKER_THRESHOLD;
       const acousticFallback = source === 'ACOUSTIC_FALLBACK';
+      if (!profile.isCandidate && !acousticFallback) {
+        threshold = Math.min(threshold, SHERPA_OFFICIAL_REGISTERED_SEARCH_FLOOR);
+      }
       if (acousticFallback) {
         // A single explicitly named sample remains usable in degraded mode,
         // but requires a near-identical match until more enrollment samples
