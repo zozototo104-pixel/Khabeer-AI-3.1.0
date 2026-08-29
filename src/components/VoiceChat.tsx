@@ -1259,6 +1259,8 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
                 // Temporary queue starvation between streamed chunks
                 queueStarvationCountRef.current += 1;
                 queueStarvationStartedAtRef.current = Date.now();
+                playbackWarmupReadyRef.current = false;
+                playbackWarmupStartedAtRef.current = 0;
                 addDebugLog(`[SCHED_DIAG] QUEUE_STARVATION while aiTurnOpen=true`);
               }
             }
