@@ -1066,6 +1066,20 @@ let lastInjectedSpeakerTurnId = -1;
       return { value: current + incoming, delta: incoming };
     };
 
+    const extractConsentedEnrollmentName = (text: string): string => {
+      const cleaned = String(text || '')
+        .replace(/[،,.!?؟]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (!cleaned || /\b(?:لا|رفض|ما\s+بدي|لا\s+تسجل)\b/i.test(cleaned)) return '';
+      const match = cleaned.match(/(?:نعم|موافق|اوكي|تمام|سجلني|سجّلني|أوافق|اوافق)?\s*(?:اسمي|إسمي|انا|أنا|معك|اسجلها باسم|سجلها باسم|سجلني باسم)\s+([\u0621-\u064A][\u0621-\u064A\s]{1,60})/i);
+      if (!match?.[1]) return '';
+      const stop = new Set(['اللي', 'الذي', 'التي', 'بحب', 'احب', 'أحب', 'عندي', 'من', 'في', 'هو', 'هي']);
+      const words = match[1].split(/\s+/).filter((word) => word && !stop.has(word));
+      const name = words.slice(0, 3).join(' ').trim();
+      return name.length >= 2 ? name.slice(0, 80) : '';
+    };
+
     let transcriptFlushQueue: Promise<void> = Promise.resolve();
     const flushPendingTranscripts = (): Promise<void> => {
       if (!dbSessionId) return transcriptFlushQueue;
