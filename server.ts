@@ -1300,8 +1300,6 @@ async function startServer() {
 
       if (isCalibration) return;
       if (phase === 'FINAL' && activeSpeakerAttribution.identitySource !== 'VERIFIED') {
-        lastInjectedSpeakerId = '';
-        lastInjectedSpeakerTurnId = -1;
         if (activeLiveSession) {
           sendLiveContext(activeLiveSession, `[بيانات وصفية للنظام - نتيجة نهائية للمقطع الحالي: لم يتم التحقق صوتياً من هوية المتحدث. لا تستخدم أي اسم سابق مثل أبو مصعب أو تغريد لهذا المقطع. إذا سأل المتحدث "من أنا؟" أجب: لا أستطيع تأكيد هويتك صوتياً الآن.]`);
         }
@@ -1309,13 +1307,7 @@ async function startServer() {
       }
 
       if (diagResult.identitySource !== 'VERIFIED' || !diagResult.speakerId) return;
-if (lastInjectedSpeakerId === diagResult.speakerId && lastInjectedSpeakerTurnId === currentTurn) return;
-lastInjectedSpeakerId = diagResult.speakerId;
-lastInjectedSpeakerTurnId = currentTurn;
-
-      if (activeLiveSession) {
-        sendLiveContext(activeLiveSession, `[بيانات وصفية للنظام - لا تجب على هذه الرسالة: المتحدث الحالي الموثق صوتياً هو ${diagResult.name} (id=${diagResult.speakerId}). عندما يسأل المستخدم "من أنا" أو يطلب نسبة الكلام، استخدم هذه الهوية الصوتية الموثقة للدور الجاري.]`);
-      }
+      injectVerifiedSpeakerHandoffContext(`VERIFIED_${phase}`, phase);
     };
 
     let isAlive = true;
