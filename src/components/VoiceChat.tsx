@@ -344,7 +344,7 @@ const [systemInstruction, setSystemInstruction] = useState(
         if (Array.isArray(parsed) && parsed.length > 0) {
           let needsUpdate = false;
           const migratedProfiles = parsed.filter(p => {
-             if (p.id && p.id.startsWith('unknown_session')) {
+             if ((p.id && p.id.startsWith('unknown_session')) || p.isCandidate) {
                 needsUpdate = true;
                 return false;
              }
