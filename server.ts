@@ -2494,6 +2494,7 @@ ${liveKnowledgeContext}`;
           }
           if (activeLiveSession) {
             try {
+              flushPendingLiveContext('BEFORE_USER_TEXT');
               if (isSelfIdentityQuestion(msg.userText)) {
                 injectAuthoritativeIdentityAnswerIfNeeded();
               }
