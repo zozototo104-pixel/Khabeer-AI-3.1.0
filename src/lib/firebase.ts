@@ -19,10 +19,10 @@ googleAuthProvider.setCustomParameters({
 });
 export const db = getFirestore(app);
 
-export async function getAuthToken(): Promise<string | null> {
+export async function getAuthToken(forceRefresh = false): Promise<string | null> {
   try {
     if (auth.currentUser) {
-      const t = await auth.currentUser.getIdToken();
+      const t = await auth.currentUser.getIdToken(forceRefresh);
       if (t) return t;
     }
     const savedDirect = localStorage.getItem('direct_user_session');
