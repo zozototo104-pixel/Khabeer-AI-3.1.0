@@ -315,13 +315,33 @@ export class SpeechEngine {
           ? corroboratedProbe
           : this.stabilizeLiveProbe(corroboratedProbe, sessionId);
         if (stableLive) {
+          const serial = this.speechSerial.get(sessionId) || 0;
           if (stableLive.identitySource === 'VERIFIED') {
             this.recentVerifiedProbe.set(sessionId, {
-              serial: this.speechSerial.get(sessionId) || 0,
+              serial,
               at: Date.now(),
               result: stableLive,
             });
           }
+
+          const publishKey = `${stableLive.identitySource}:${stableLive.speakerId || stableLive.name || 'unknown'}`;
+          const previousPublished = this.lastPublishedProbe.get(sessionId);
+          const duplicateProbe = previousPublished
+            && previousPublished.serial === serial
+            && previousPublished.key === publishKey
+            && Math.abs(previousPublished.similarity - stableLive.similarity) < 0.03
+            && Date.now() - previousPublished.at < 12_000;
+          if (duplicateProbe) {
+            diarizer['callbacks']?.onDebugLog?.(`[Speaker:ProbeSuppressed] key=${publishKey} sim=${stableLive.similarity.toFixed(3)} serial=${serial}`);
+            return null;
+          }
+          this.lastPublishedProbe.set(sessionId, {
+            serial,
+            key: publishKey,
+            similarity: stableLive.similarity,
+            at: Date.now(),
+          });
+
           return {
             speakerId: stableLive.speakerId,
             name: stableLive.name,
