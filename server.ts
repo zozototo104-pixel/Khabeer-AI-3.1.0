@@ -1787,13 +1787,12 @@ ${liveKnowledgeContext}`;
                       let foundText = "";
                       try {
                         const targetOrg = org?.id || 1;
-                        const results = await ragEngine.findSpecificArticleOrClause(q, targetOrg);
-                        if (results && results.length > 0) {
-                          foundText = results.join("\n\n---\n\n");
-                        } else {
-                          const fallbackResults = await ragEngine.searchCompanyDocuments(q, targetOrg);
-                          foundText = fallbackResults.join("\n\n---\n\n");
-                        }
+                        foundText = await ragEngine.searchLiveRegulationEvidence(q, targetOrg, 18_000);
+                        console.log('[LiveRAG] lookup_regulation_article', {
+                          query: q,
+                          orgId: targetOrg,
+                          chars: foundText.length,
+                        });
                       } catch (lookupErr: any) {
                         foundText = `حدث خطأ أثناء البحث: ${lookupErr?.message || lookupErr}`;
                       }
