@@ -5286,20 +5286,32 @@ console.log(
       const scope = await resolveOwnedSpeakerScope(req, sessionId);
       // PostgreSQL is authoritative. Delete there first so a DB failure can
       // never leave the UI/runtime claiming that a persistent profile vanished.
-      const { deletePersistentSpeakerProfile } = await import('./src/db/speakers.ts');
-      const dbDeleted = await deletePersistentSpeakerProfile(req.user.uid, String(speakerId));
-      if (!dbDeleted) {
+      const { deletePersistentSpeakerProfileFamily } = await import('./src/db/speakers.ts');
+      const deletion = await deletePersistentSpeakerProfileFamily(req.user.uid, String(speakerId));
+      if (!deletion.deleted) {
         return res.status(404).json({ error: 'Speaker profile not found' });
       }
 
       // Runtime cleanup is best-effort after the durable deletion succeeds.
-      // A registry may not exist yet for this scope, which must not prevent a
-      // user from deleting their persisted profile.
+      // Remove all duplicate DB rows for the same normalized speaker name so
+      // deleting/re-enrolling تغريد or أبو مصعب cannot leave stale copies in UI.
       const registry = (speechEngine as any).getSessionRegistry(scope);
-      const runtimeRemoved = Boolean(registry && typeof registry.removeProfile === 'function'
-        ? registry.removeProfile(String(speakerId))
-        : false);
-      res.json({ success: true, removed: true, speakerId, dbDeleted: true, runtimeRemoved });
+      let runtimeRemoved = 0;
+      if (registry && typeof registry.removeProfile === 'function') {
+        for (const id of deletion.speakerIds) {
+          if (registry.removeProfile(String(id))) runtimeRemoved += 1;
+        }
+      }
+      res.json({
+        success: true,
+        removed: true,
+        speakerId,
+        speakerIds: deletion.speakerIds,
+        name: deletion.name,
+        dbDeleted: true,
+        deletedCount: deletion.deleted,
+        runtimeRemoved,
+      });
     } catch (e: any) {
       res.status(e?.status || 500).json({ error: e?.message || 'Failed to delete speaker profile' });
     }
