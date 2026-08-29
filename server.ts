@@ -1022,8 +1022,6 @@ async function startServer() {
     let isGuestInvite = false;
     let activeOrgId: number | null = null;
     let activeLeadExpertId = 'governance_advisor';
-    let lastInjectedSpeakerId = '';
-let lastInjectedSpeakerTurnId = -1;
     let lastSpeakerTask: Promise<any> | null = null;
     let pendingSpeechEndTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingSelfIdentifiedName = '';
