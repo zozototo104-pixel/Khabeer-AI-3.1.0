@@ -58,7 +58,7 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
     let active = true;
     (async () => {
       try {
-        const activeToken = propToken || await getAuthToken();
+        const activeToken = await getAuthToken() || propToken;
         if (!activeToken) return;
         const res = await fetch('/api/organization', { headers: { Authorization: `Bearer ${activeToken}` } });
         if (!res.ok) return;
