@@ -309,7 +309,7 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
     if (!docToDelete) return;
     setIsDeleting(true);
     try {
-      const activeToken = propToken || await getAuthToken();
+      const activeToken = await getAuthToken() || propToken;
       if (!activeToken) throw new Error('لا يوجد رمز تحقق');
 
       const res = await fetch(`/api/knowledge/${docToDelete.id}?orgId=${encodeURIComponent(selectedOrgId)}`, {
