@@ -2135,6 +2135,9 @@ ${liveKnowledgeContext}`;
                 if (inputTranscription) {
                   const appended = appendStreamingText(accumulatedUserText, inputTranscription);
                   accumulatedUserText = appended.value;
+                  if (isSelfIdentityQuestion(accumulatedUserText) || isSelfIdentityQuestion(appended.delta)) {
+                    injectAuthoritativeIdentityAnswerIfNeeded();
+                  }
                   if (pendingEnrollmentCandidateId && dbSessionId && !guestConnection) {
                     const confirmedName = extractConsentedEnrollmentName(accumulatedUserText);
                     if (confirmedName) {
