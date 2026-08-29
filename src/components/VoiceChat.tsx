@@ -381,10 +381,11 @@ const [systemInstruction, setSystemInstruction] = useState(
              return p;
           });
           
-          if (needsUpdate) {
-             localStorage.setItem('gemini_speaker_profiles_v4', JSON.stringify(migratedProfiles));
+          const dedupedProfiles = dedupeSpeakerProfilesForUi(migratedProfiles);
+          if (needsUpdate || dedupedProfiles.length !== migratedProfiles.length) {
+             localStorage.setItem('gemini_speaker_profiles_v4', JSON.stringify(dedupedProfiles));
           }
-          return migratedProfiles;
+          return dedupedProfiles;
         }
       }
     } catch {}
