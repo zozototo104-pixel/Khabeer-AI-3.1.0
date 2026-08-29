@@ -1030,6 +1030,7 @@ let lastInjectedSpeakerTurnId = -1;
     let pendingEnrollmentCandidateId = '';
     const candidateEnrollmentEvidence = new Map<string, { hits: number; scoreSum: number; lastAt: number; promptedAt: number }>();
     let activeSpeakerTurnId = 0;
+    let identityAnswerInjectedTurnId = -1;
     let activeSpeakerAttribution: {
       speakerId: string | null;
       speakerName: string;
