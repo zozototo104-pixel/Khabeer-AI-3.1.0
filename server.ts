@@ -1031,6 +1031,9 @@ let lastInjectedSpeakerTurnId = -1;
     const candidateEnrollmentEvidence = new Map<string, { hits: number; scoreSum: number; lastAt: number; promptedAt: number }>();
     let activeSpeakerTurnId = 0;
     let identityAnswerInjectedTurnId = -1;
+    let lastInjectedVerifiedSpeakerId = '';
+    let lastInjectedVerifiedSpeakerAt = 0;
+    let speakerContextVersion = 0;
     let activeSpeakerAttribution: {
       speakerId: string | null;
       speakerName: string;
