@@ -27,6 +27,13 @@ interface RegisterOptions {
 const UNKNOWN_NAME = 'متحدث غير معروف';
 const AMBIGUOUS_NAME = 'تداخل أصوات';
 
+// sherpa-onnx official JS speaker-identification example uses
+// manager.search({ v, threshold: 0.5 }) for 3D-Speaker ERes2Net embeddings.
+// Keep application confidence labels unchanged, but do not reject a clearly
+// leading registered speaker solely because the legacy SAME_SPEAKER_THRESHOLD
+// is stricter than the model's documented search floor.
+const SHERPA_OFFICIAL_REGISTERED_SEARCH_FLOOR = 0.5;
+
 function cloneProfile(profile: SpeakerProfile): SpeakerProfile {
   return {
     ...profile,
