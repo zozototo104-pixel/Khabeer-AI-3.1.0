@@ -1,4 +1,4 @@
-import { and, eq, notInArray } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { db } from './index.ts';
 import { speakerProfiles } from './schema.ts';
 import type { SpeakerProfile } from '../lib/speaker/types.ts';
