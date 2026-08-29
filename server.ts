@@ -2504,6 +2504,7 @@ ${liveKnowledgeContext}`;
             }
           }
         } else if (msg.type === 'speech_start') {
+          flushPendingLiveContext('BEFORE_USER_SPEECH');
           const sid = dbSessionId ? String(dbSessionId) : 'global';
           const resumedPendingFinalization = Boolean(pendingSpeechEndTimer);
           if (pendingSpeechEndTimer) {
