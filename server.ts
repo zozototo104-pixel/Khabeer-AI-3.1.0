@@ -1886,13 +1886,17 @@ ${liveKnowledgeContext}`;
                           new Promise((resolve) => setTimeout(resolve, 600)),
                         ]);
                       }
-                      if (!guestConnection && speakerName && dbSessionId && activeSpeakerAttribution.speakerId) {
+                      const candidateToPromote = pendingEnrollmentCandidateId || (activeSpeakerAttribution.identitySource === 'CANDIDATE' ? activeSpeakerAttribution.speakerId || '' : '');
+                      if (!guestConnection && speakerName && dbSessionId && candidateToPromote) {
                         const promoted = speechEngine.promoteCandidate(
-                          activeSpeakerAttribution.speakerId,
+                          candidateToPromote,
                           speakerName,
                           String(dbSessionId),
                         );
                         if (promoted) {
+                          pendingEnrollmentCandidateId = '';
+                          pendingSelfIdentifiedName = '';
+                          candidateEnrollmentEvidence.delete(candidateToPromote);
                           activeSpeakerAttribution = {
                             speakerId: promoted.id,
                             speakerName: promoted.name,
@@ -1907,18 +1911,16 @@ ${liveKnowledgeContext}`;
                           }
                           if (clientWs.readyState === clientWs.OPEN) {
                             clientWs.send(JSON.stringify({ type: 'speaker_profiles_synced', profiles: updatedProfiles }));
+                            clientWs.send(JSON.stringify({ type: 'voice_profile_registered', profile: promoted }));
                           }
-                          registrationOutput = `تم ربط البصمة الصوتية الحالية بالاسم ${speakerName} وحفظها.`;
+                          registrationOutput = `تم ربط البصمة الصوتية الجديدة بالاسم ${speakerName} وحفظها بعد موافقة المتحدث.`;
                         }
                       }
                       if (speakerName && !registrationOutput.startsWith('تم ربط')) {
-                        pendingSelfIdentifiedName = speakerName;
-                        registrationOutput = `تم التقاط الاسم ${speakerName}، وسيكتمل ربطه بعد انتهاء التحقق من المقطع الصوتي الحالي.`;
-                      }
-
-                      // Keep the lightweight browser footprint in sync as a UI fallback.
-                      if (clientWs.readyState === clientWs.OPEN) {
-                        clientWs.send(JSON.stringify({ type: 'register_voice_profile', name: speakerName }));
+                        pendingSelfIdentifiedName = pendingEnrollmentCandidateId ? speakerName : '';
+                        registrationOutput = pendingEnrollmentCandidateId
+                          ? `تم التقاط الاسم ${speakerName}، وسيكتمل ربطه بعد انتهاء التحقق من المرشح الصوتي الحالي.`
+                          : `لا توجد بصمة مرشح جديدة ثابتة جاهزة للتسجيل الآن. اطلب من المتحدث الكلام بوضوح أولاً حتى يكتشفه النظام كمتحدث جديد، ثم اطلب الاسم والموافقة.`;
                       }
                       
                       try {
