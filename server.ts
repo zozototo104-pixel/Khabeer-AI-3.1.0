@@ -1152,10 +1152,23 @@ async function startServer() {
 
     const flushPendingLiveContext = (reason: string) => {
       if (!activeLiveSession || !pendingLiveContext || liveAssistantTurnOpen) return;
+      // Deferred metadata must be applied only immediately before the next real
+      // user input. Sending it right after TURN_COMPLETE can make Gemini Live
+      // treat metadata as a new conversational event, causing repeated phrases
+      // or an apparent audio cut. This keeps speaker/KB updates invisible and
+      // prevents them from interrupting or restarting assistant speech.
+      if (!/^BEFORE_USER_/.test(reason)) {
+        console.log('[LiveContext] Holding deferred metadata until next user input', {
+          reason,
+          queuedReason: pendingLiveContext.reason,
+          queuedMs: Date.now() - pendingLiveContext.queuedAt,
+        });
+        return;
+      }
       const pending = pendingLiveContext;
       pendingLiveContext = null;
       sendLiveContext(activeLiveSession, pending.text);
-      console.log('[LiveContext] Flushed deferred metadata', {
+      console.log('[LiveContext] Flushed deferred metadata before user input', {
         reason,
         queuedReason: pending.reason,
         queuedMs: Date.now() - pending.queuedAt,
