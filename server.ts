@@ -2314,6 +2314,9 @@ ${liveKnowledgeContext}`;
           }
           if (activeLiveSession) {
             try {
+              if (isSelfIdentityQuestion(msg.userText)) {
+                injectAuthoritativeIdentityAnswerIfNeeded();
+              }
               sendLiveText(activeLiveSession, msg.userText);
             } catch(e: any) {
                console.warn("send text error", e?.message || e);
