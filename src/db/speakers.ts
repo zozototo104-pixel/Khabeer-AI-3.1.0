@@ -239,3 +239,23 @@ export async function deletePersistentSpeakerProfile(ownerId: string, speakerId:
   )).returning({ id: speakerProfiles.id });
   return Array.isArray(result) && result.length > 0;
 }
+
+export async function deletePersistentSpeakerProfileFamily(ownerId: string, speakerId: string): Promise<{ deleted: number; speakerIds: string[]; name: string | null }> {
+  if (!ownerId || !speakerId) return { deleted: 0, speakerIds: [], name: null };
+  const rows = await db.select().from(speakerProfiles).where(eq(speakerProfiles.ownerId, ownerId));
+  const target = rows.find((row) => row.speakerId === speakerId);
+  if (!target) return { deleted: 0, speakerIds: [], name: null };
+  const targetKey = normalizeSpeakerNameForDedupe(target.name);
+  const speakerIds = rows
+    .filter((row) => row.speakerId === speakerId || normalizeSpeakerNameForDedupe(row.name) === targetKey)
+    .map((row) => row.speakerId);
+  let deleted = 0;
+  for (const id of speakerIds) {
+    const result = await db.delete(speakerProfiles).where(and(
+      eq(speakerProfiles.ownerId, ownerId),
+      eq(speakerProfiles.speakerId, id),
+    )).returning({ id: speakerProfiles.id });
+    if (Array.isArray(result)) deleted += result.length;
+  }
+  return { deleted, speakerIds, name: target.name };
+}
