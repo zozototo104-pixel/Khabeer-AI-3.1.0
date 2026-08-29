@@ -2112,6 +2112,35 @@ ${liveKnowledgeContext}`;
                 if (inputTranscription) {
                   const appended = appendStreamingText(accumulatedUserText, inputTranscription);
                   accumulatedUserText = appended.value;
+                  if (pendingEnrollmentCandidateId && dbSessionId && !guestConnection) {
+                    const confirmedName = extractConsentedEnrollmentName(accumulatedUserText);
+                    if (confirmedName) {
+                      const candidateId = pendingEnrollmentCandidateId;
+                      const promoted = speechEngine.promoteCandidate(candidateId, confirmedName, String(dbSessionId));
+                      if (promoted) {
+                        pendingEnrollmentCandidateId = '';
+                        pendingSelfIdentifiedName = '';
+                        candidateEnrollmentEvidence.delete(candidateId);
+                        activeSpeakerAttribution = {
+                          speakerId: promoted.id,
+                          speakerName: promoted.name,
+                          speakerConfidence: promoted.confidence,
+                          identitySource: 'VERIFIED',
+                        };
+                        const updatedProfiles = speechEngine.getSpeakerProfiles(String(dbSessionId));
+                        if (ownerUid) {
+                          await replacePersistentSpeakerProfiles(ownerUid, updatedProfiles);
+                        }
+                        sendClientEvent({ type: 'speaker_profiles_synced', profiles: updatedProfiles });
+                        sendClientEvent({ type: 'voice_profile_registered', profile: promoted });
+                        console.log('[SpeakerEnrollment] CANDIDATE_PROMOTED_FROM_TRANSCRIPT', {
+                          candidateId,
+                          speakerName: promoted.name,
+                          profileId: promoted.id,
+                        });
+                      }
+                    }
+                  }
                   if (appended.delta) {
                     clientWs.send(JSON.stringify({
                       text: appended.delta,
