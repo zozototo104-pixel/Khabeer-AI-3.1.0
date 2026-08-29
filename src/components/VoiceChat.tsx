@@ -1146,28 +1146,43 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
       const adaptiveLookaheadMs = Math.max(25, Math.min(110, 25 + jitterVariationMs * 1.35));
       lastAdaptiveLookaheadMsRef.current = adaptiveLookaheadMs;
 
-      // A short adaptive pre-buffer prevents the first lone chunk after a
-      // mobile-network gap from playing immediately and then starving again.
+      // Real jitter buffer: after a cold start or starvation, wait until we have
+      // enough queued audio duration to bridge Render/Gemini/iPhone chunk jitter.
+      // We cap the wait so the assistant remains responsive even if chunks are
+      // genuinely sparse.
+      const queuedAudioMs = audioQueueRef.current.reduce((sum, item) => sum + item.duration * 1000, 0);
+      const recoveringFromStarvation = queueStarvationStartedAtRef.current > 0;
+      const targetBufferMs = recoveringFromStarvation
+        ? Math.max(360, Math.min(1200, adaptiveLookaheadMs * 4 + 280))
+        : Math.max(220, Math.min(850, adaptiveLookaheadMs * 3 + 160));
+      const maxWarmupWaitMs = recoveringFromStarvation ? 950 : 520;
       const shouldWarmUp = !isCurrentlyPlaying
-        && audioQueueRef.current.length === 1
+        && audioQueueRef.current.length > 0
         && isAiTurnInProgressRef.current
-        && !playbackWarmupReadyRef.current;
+        && !playbackWarmupReadyRef.current
+        && queuedAudioMs < targetBufferMs;
       if (shouldWarmUp) {
-        if (!playbackWarmupTimerRef.current) {
-          const warmupMs = Math.max(70, Math.min(160, adaptiveLookaheadMs + 50));
-          playbackWarmupTimerRef.current = setTimeout(() => {
-            playbackWarmupTimerRef.current = null;
-            playbackWarmupReadyRef.current = true;
-            flushQueue();
-          }, warmupMs);
+        if (!playbackWarmupStartedAtRef.current) playbackWarmupStartedAtRef.current = Date.now();
+        const elapsedWarmupMs = Date.now() - playbackWarmupStartedAtRef.current;
+        if (elapsedWarmupMs < maxWarmupWaitMs) {
+          if (!playbackWarmupTimerRef.current) {
+            const retryMs = Math.max(50, Math.min(140, maxWarmupWaitMs - elapsedWarmupMs));
+            playbackWarmupTimerRef.current = setTimeout(() => {
+              playbackWarmupTimerRef.current = null;
+              flushQueue();
+            }, retryMs);
+          }
+          return;
         }
-        return;
+        addDebugLog(`[JITTER_BUFFER_TIMEOUT] queuedMs=${Math.round(queuedAudioMs)} targetMs=${Math.round(targetBufferMs)} waitMs=${elapsedWarmupMs} starvation=${recoveringFromStarvation}`);
+        playbackWarmupReadyRef.current = true;
       }
       if (playbackWarmupTimerRef.current) {
         clearTimeout(playbackWarmupTimerRef.current);
         playbackWarmupTimerRef.current = null;
       }
       playbackWarmupReadyRef.current = false;
+      playbackWarmupStartedAtRef.current = 0;
       
       if (!isCurrentlyPlaying && audioQueueRef.current.length > 0 && queueStarvationStartedAtRef.current > 0) {
           const starvationDurationMs = Date.now() - queueStarvationStartedAtRef.current;
