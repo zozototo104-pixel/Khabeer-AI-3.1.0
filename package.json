@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:migrate:prod": "node dist/migrate.cjs",
-    "test:unit": "node --experimental-strip-types --test tests/*.unit.test.ts",
+    "test:unit": "node --experimental-strip-types --test --test-reporter=spec tests/*.unit.test.ts",
     "test:speaker": "node --experimental-strip-types --test tests/speaker_registry.unit.test.ts",
     "speaker:download-model": "node scripts/download-speaker-model.mjs",
     "speaker:verify-model": "node --experimental-strip-types scripts/verify-speaker-model.ts",
