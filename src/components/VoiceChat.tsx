@@ -444,6 +444,7 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
   const lastAdaptiveLookaheadMsRef = useRef<number>(30);
   const playbackWarmupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const playbackWarmupReadyRef = useRef<boolean>(false);
+  const playbackWarmupStartedAtRef = useRef<number>(0);
   const bargeInConfirmedRef = useRef<boolean>(false);
   const aiPlaybackStartedAtRef = useRef<number>(0);
   const echoGuardPeakRmsRef = useRef<number>(0);
