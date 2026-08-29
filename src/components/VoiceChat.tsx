@@ -54,6 +54,27 @@ type ExpertProfileSummary = {
   capabilities: string[];
 };
 
+const normalizeSpeakerNameForUiDedupe = (name: string): string => String(name || '')
+  .trim()
+  .replace(/\s+/g, ' ')
+  .replace(/[إأآا]/g, 'ا')
+  .replace(/ى/g, 'ي')
+  .replace(/ة/g, 'ه')
+  .toLowerCase();
+
+const dedupeSpeakerProfilesForUi = (profiles: SpeakerProfile[]): SpeakerProfile[] => {
+  const byName = new Map<string, SpeakerProfile>();
+  for (const profile of profiles.filter((item) => item && !item.isCandidate && !String(item.id || '').startsWith('unknown_') && !String(item.id || '').startsWith('candidate_'))) {
+    const key = normalizeSpeakerNameForUiDedupe(profile.name);
+    if (!key) continue;
+    const current = byName.get(key);
+    if (!current || (profile.updatedAt || 0) >= (current.updatedAt || 0)) {
+      byName.set(key, profile);
+    }
+  }
+  return Array.from(byName.values());
+};
+
 const EXPERT_CATEGORY_LABELS: Record<string, string> = {
   GOVERNANCE_CONTROL: 'الحوكمة والرقابة',
   MANAGEMENT_STRATEGY: 'الإدارة والاستراتيجية',
