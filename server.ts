@@ -2014,6 +2014,39 @@ ${liveKnowledgeContext}`;
                       } catch (tErr) {
                         console.warn("Live tool response execution notice:", tErr);
                       }
+                    } else if (call.name === "external_expert_knowledge") {
+                      const question = String(call.args?.question || '').trim();
+                      const expertHint = String(call.args?.expertHint || '').trim();
+                      let output = '';
+                      if (!shouldUseExternalExpertKnowledge(question)) {
+                        output = 'هذا السؤال لا يحتاج بحث ويب خارجي واضح. استخدم قاعدة المعرفة الداخلية أولاً، وإذا كانت غير كافية فاشرح حدود المعرفة الداخلية بوضوح.';
+                      } else {
+                        output = await buildExternalExpertKnowledgeContext(question, { expertHint });
+                        if (!output) {
+                          output = 'تعذر استرجاع معرفة ويب موثوقة حالياً. لا تخترع معلومات؛ اعتمد على قاعدة المعرفة الداخلية وما تعرفه بشكل عام مع التنبيه لضرورة التحقق من الجهة المختصة.';
+                        }
+                      }
+                      console.log('[ExternalKnowledge] external_expert_knowledge', {
+                        chars: output.length,
+                        expertHint,
+                        question: question.slice(0, 160),
+                      });
+                      try {
+                        const s = await sessionPromise;
+                        if (s && typeof (s as any).sendToolResponse === "function") {
+                          (s as any).sendToolResponse({
+                            functionResponses: [
+                              {
+                                id: call.id || "call_external_knowledge_1",
+                                name: call.name,
+                                response: { output }
+                              }
+                            ]
+                          });
+                        }
+                      } catch (tErr) {
+                        console.warn("External knowledge tool response notice:", tErr);
+                      }
                     } else if (call.name === "register_voice_profile") {
                       const speakerName = String(call.args?.speakerName || "").replace(/\s+/g, ' ').trim().slice(0, 120);
                       console.log("Registering voice profile for:", speakerName);
