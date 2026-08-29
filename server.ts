@@ -1150,6 +1150,28 @@ async function startServer() {
       return /(?:من\s+انا|من\s+أنا|مين\s+انا|مين\s+أنا|تعرفني|عرفتني|هل\s+تعرف\s+من\s+انا|هل\s+تعرف\s+من\s+أنا)/i.test(value);
     };
 
+    const flushPendingLiveContext = (reason: string) => {
+      if (!activeLiveSession || !pendingLiveContext || liveAssistantTurnOpen) return;
+      const pending = pendingLiveContext;
+      pendingLiveContext = null;
+      sendLiveContext(activeLiveSession, pending.text);
+      console.log('[LiveContext] Flushed deferred metadata', {
+        reason,
+        queuedReason: pending.reason,
+        queuedMs: Date.now() - pending.queuedAt,
+      });
+    };
+
+    const sendOrQueueLiveContext = (text: string, reason: string, urgent = false) => {
+      if (!activeLiveSession) return;
+      if (!urgent && liveAssistantTurnOpen) {
+        pendingLiveContext = { text, reason, queuedAt: Date.now() };
+        console.log('[LiveContext] Deferred metadata while assistant turn is open', { reason });
+        return;
+      }
+      sendLiveContext(activeLiveSession, text);
+    };
+
     const injectVerifiedSpeakerHandoffContext = (reason: string, phase: 'PROBE' | 'FINAL' | 'IDENTITY_QUESTION' = 'PROBE') => {
       if (!activeLiveSession) return;
       if (activeSpeakerAttribution.identitySource !== 'VERIFIED' || !activeSpeakerAttribution.speakerId || !activeSpeakerAttribution.speakerName || activeSpeakerAttribution.speakerName === 'متحدث غير معروف') return;
@@ -1161,8 +1183,9 @@ async function startServer() {
       lastInjectedVerifiedSpeakerId = activeSpeakerAttribution.speakerId;
       lastInjectedVerifiedSpeakerAt = now;
       const confidencePct = Math.round((activeSpeakerAttribution.speakerConfidence || 0) * 100);
-      sendLiveContext(activeLiveSession, `[بيانات وصفية إلزامية للنظام - SPEAKER_HANDOFF v${speakerContextVersion}: المتحدث الحالي الآن هو ${activeSpeakerAttribution.speakerName} (id=${activeSpeakerAttribution.speakerId}) حسب البصمة الصوتية العصبية الموثقة، الثقة ${confidencePct}%. من هذه اللحظة خاطب هذا المتحدث بالاسم الحرفي الحالي فقط: "${activeSpeakerAttribution.speakerName}". لا تضف لقباً أو نسبة أو اسم عائلة من المشاركين أو الذاكرة أو صاحب الحساب، ولا تستخدم اسم المتحدث السابق. إذا سألك "من أنا؟" فأجب: "أنت ${activeSpeakerAttribution.speakerName} حسب البصمة الصوتية الموثقة الآن." لا تقل إن البصمة غير مسجلة ما دامت هذه الرسالة VERIFIED.]`);
-      console.log('[SpeakerHandoff] Injected verified speaker context', {
+      const contextText = `[بيانات وصفية إلزامية للنظام - SPEAKER_HANDOFF v${speakerContextVersion}: المتحدث الحالي الآن هو ${activeSpeakerAttribution.speakerName} (id=${activeSpeakerAttribution.speakerId}) حسب البصمة الصوتية العصبية الموثقة، الثقة ${confidencePct}%. من هذه اللحظة خاطب هذا المتحدث بالاسم الحرفي الحالي فقط: "${activeSpeakerAttribution.speakerName}". لا تضف لقباً أو نسبة أو اسم عائلة من المشاركين أو الذاكرة أو صاحب الحساب، ولا تستخدم اسم المتحدث السابق. إذا سألك "من أنا؟" فأجب: "أنت ${activeSpeakerAttribution.speakerName} حسب البصمة الصوتية الموثقة الآن." لا تقل إن البصمة غير مسجلة ما دامت هذه الرسالة VERIFIED.]`;
+      sendOrQueueLiveContext(contextText, `SPEAKER_HANDOFF:${reason}:${phase}`, phase === 'IDENTITY_QUESTION');
+      console.log('[SpeakerHandoff] Queued/injected verified speaker context', {
         reason,
         phase,
         turn: liveTurnSequence,
@@ -1172,6 +1195,7 @@ async function startServer() {
         version: speakerContextVersion,
         speakerChanged,
         stale,
+        liveAssistantTurnOpen,
       });
     };
 
