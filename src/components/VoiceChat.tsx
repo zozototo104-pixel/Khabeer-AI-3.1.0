@@ -1663,8 +1663,9 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
             }
           }
           if (msg.type === 'speaker_profiles_synced' && Array.isArray(msg.profiles)) {
-            const registry = new SpeakerRegistry(msg.profiles);
-            const normalizedProfiles = registry.getAllSpeakers();
+            const durableProfiles = msg.profiles.filter((profile: any) => !profile?.isCandidate);
+            const registry = new SpeakerRegistry(durableProfiles);
+            const normalizedProfiles = registry.getAllSpeakers().filter((profile) => !profile.isCandidate);
             speakerRegistryRef.current = registry;
             setSpeakerProfiles(normalizedProfiles);
             try {
