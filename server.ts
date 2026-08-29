@@ -2377,7 +2377,6 @@ ${liveKnowledgeContext}`;
                   }
                   await flushPendingTranscripts();
                   liveAssistantTurnOpen = false;
-                  flushPendingLiveContext('TURN_COMPLETE');
                   liveTurnSequence += 1;
                 }
               },
