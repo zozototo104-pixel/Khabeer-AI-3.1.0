@@ -945,8 +945,27 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
   // Handle Text Message Submission
   const handleSendTextMessage = async (textToSend?: string) => {
     const rawText = textToSend || inputText;
-    const activeToken = token || await getAuthToken();
+    let activeToken = await getAuthToken() || token;
     if (!rawText.trim() || !activeToken || isSendingText) return;
+
+    const authedFetch = async (url: string, init: RequestInit = {}) => {
+      const buildInit = (bearer: string): RequestInit => ({
+        ...init,
+        headers: {
+          ...((init.headers || {}) as Record<string, string>),
+          Authorization: `Bearer ${bearer}`,
+        },
+      });
+      let response = await fetch(url, buildInit(activeToken as string));
+      if (response.status === 401) {
+        const refreshed = await getAuthToken(true);
+        if (refreshed && refreshed !== activeToken) {
+          activeToken = refreshed;
+          response = await fetch(url, buildInit(refreshed));
+        }
+      }
+      return response;
+    };
 
     const trimmedText = rawText.trim();
     setInputText('');
