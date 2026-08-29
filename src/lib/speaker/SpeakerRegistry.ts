@@ -499,7 +499,25 @@ if (!isCandidate) {
     const profile = this.profiles.get(candidateId);
     const cleanName = normalizeName(name);
     if (!profile || !cleanName) return null;
-    if (!profile.isCandidate) return profile.name === cleanName ? profile : null;
+    if (!profile.isCandidate) return normalizeNameKey(profile.name) === normalizeNameKey(cleanName) ? profile : null;
+
+    const existing = [...this.profiles.values()].find((item) =>
+      !item.isCandidate
+      && normalizeNameKey(item.name) === normalizeNameKey(cleanName)
+      && item.centroidEmbedding.length === profile.centroidEmbedding.length
+      && (!item.embeddingModel || !profile.embeddingModel || item.embeddingModel === profile.embeddingModel),
+    );
+    if (existing) {
+      for (const embedding of profile.embeddings) {
+        this.updateSpeaker(existing.id, embedding, 'HIGH', true);
+      }
+      existing.name = cleanName;
+      existing.confidence = Math.max(existing.confidence, profile.confidence, 0.85);
+      existing.updatedAt = Date.now();
+      this.profiles.delete(profile.id);
+      return existing;
+    }
+
     profile.name = cleanName;
     profile.isCandidate = false;
     profile.status = 'VALID';
