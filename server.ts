@@ -2430,6 +2430,7 @@ ${liveKnowledgeContext}`;
           }
         } else if (msg.type === 'interrupt') {
           console.log(`[Barge-In] Client interrupted AI playback for turn ${msg.targetTurnId} req=${msg.interruptRequestId}`);
+          liveAssistantTurnOpen = false;
           // Signal interruption to client if needed
           if (clientWs.readyState === clientWs.OPEN) {
             clientWs.send(JSON.stringify({ interrupted: true, targetTurnId: msg.targetTurnId, interruptRequestId: msg.interruptRequestId }));
