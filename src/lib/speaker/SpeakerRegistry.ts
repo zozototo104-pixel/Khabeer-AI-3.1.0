@@ -53,6 +53,14 @@ function normalizeName(name: string): string {
   return name.replace(/\s+/g, ' ').trim();
 }
 
+function normalizeNameKey(name: string): string {
+  return normalizeName(name)
+    .replace(/[إأآا]/g, 'ا')
+    .replace(/ى/g, 'ي')
+    .replace(/ة/g, 'ه')
+    .toLowerCase();
+}
+
 
 function robustProfileSimilarity(profile: SpeakerProfile, embedding: number[]): { centroid: number; strongest: number; corroborated: number; final: number } {
   const centroid = AudioFeatures.cosineSimilarity(embedding, profile.centroidEmbedding);
