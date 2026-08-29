@@ -1049,11 +1049,10 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
         .replaceAll('[[SPEAKER_NICKNAME_PLACEHOLDER]]', speakerNickname || 'رئيس الجلسة')
         .replaceAll('[[MEETING_TYPE_PLACEHOLDER]]', meetingData.desc) + panelInstruction;
 
-      const res = await fetch(`/api/sessions/${currentSid}/messages`, {
+      const res = await authedFetch(`/api/sessions/${currentSid}/messages`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${activeToken}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           text: trimmedText,
