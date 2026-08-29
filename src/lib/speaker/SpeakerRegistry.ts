@@ -391,7 +391,15 @@ if (!isCandidate) {
           status: 'SUCCESS',
           isNewCandidate: profile.isCandidate,
           identitySource: profile.isCandidate ? 'CANDIDATE' : 'VERIFIED',
-          debugInfo: { ...debugInfo, decisionReason: profile.isCandidate ? 'EXISTING_CANDIDATE_MATCH' : 'VERIFIED_MATCH', clusterId: profile.id },
+          debugInfo: {
+            ...debugInfo,
+            decisionReason: profile.isCandidate
+              ? 'EXISTING_CANDIDATE_MATCH'
+              : best.finalSimilarity >= SPEAKER_THRESHOLDS.SAME_SPEAKER_THRESHOLD
+                ? 'VERIFIED_MATCH'
+                : 'VERIFIED_SHERPA_SEARCH_FLOOR',
+            clusterId: profile.id,
+          },
         };
       }
     }
