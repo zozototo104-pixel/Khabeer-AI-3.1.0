@@ -212,20 +212,29 @@ if (!isCandidate) {
     if (!isValidEmbedding(embedding)) throw new Error('VALID_SPEAKER_EMBEDDING_REQUIRED');
 
     if (!options.isCandidate) {
-      const existing = [...this.profiles.values()].find((profile) => {
-        if (profile.isCandidate || profile.name !== cleanName) return false;
-        if (profile.centroidEmbedding.length !== embedding.length) return false;
-        if (options.embeddingModel && profile.embeddingModel && options.embeddingModel !== profile.embeddingModel) return false;
-        return true;
-      });
+      const nameKey = normalizeNameKey(cleanName);
+      const duplicates = [...this.profiles.values()]
+        .filter((profile) => {
+          if (profile.isCandidate || normalizeNameKey(profile.name) !== nameKey) return false;
+          if (profile.centroidEmbedding.length !== embedding.length) return false;
+          if (options.embeddingModel && profile.embeddingModel && options.embeddingModel !== profile.embeddingModel) return false;
+          return true;
+        })
+        .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+      const existing = duplicates[0];
 
       if (existing) {
         // This is an explicit user enrollment for an already-named person.
         // Treat the label as trusted evidence, while still enforcing the
-        // model/dimension contract above.
+        // model/dimension contract above. Collapse stale same-name duplicates
+        // so re-enrolling تغريد/أبو مصعب cannot leave multiple persistent cards.
+        for (const duplicate of duplicates.slice(1)) {
+          this.profiles.delete(duplicate.id);
+        }
         const updated = this.updateSpeaker(existing.id, embedding, 'HIGH', true);
         if (!updated) throw new Error('SPEAKER_SAMPLE_UPDATE_FAILED');
         if (!existing.embeddingModel && options.embeddingModel) existing.embeddingModel = options.embeddingModel;
+        existing.name = cleanName;
         return existing;
       }
     }
