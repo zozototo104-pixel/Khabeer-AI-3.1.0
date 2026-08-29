@@ -238,7 +238,7 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
     if (!doc.hasOriginalFile) return;
     setDownloadingDocId(doc.id);
     try {
-      const activeToken = propToken || await getAuthToken();
+      const activeToken = await getAuthToken() || propToken;
       if (!activeToken) throw new Error('يرجى تسجيل الدخول أولاً');
       const res = await fetch(`/api/knowledge/${doc.id}/file?orgId=${encodeURIComponent(selectedOrgId)}`, {
         headers: { Authorization: `Bearer ${activeToken}` },
