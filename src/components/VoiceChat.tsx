@@ -2890,13 +2890,14 @@ fetch('/api/user/profile', {
                   currentSimilarity={currentSimilarity}
                   debugLogs={debugLogs}
                   onProfilesUpdated={(updated) => {
-                    setSpeakerProfiles(updated);
-                    speakerRegistryRef.current = new SpeakerRegistry(updated);
+                    const deduped = dedupeSpeakerProfilesForUi(updated);
+                    setSpeakerProfiles(deduped);
+                    speakerRegistryRef.current = new SpeakerRegistry(deduped);
                     try {
-                      localStorage.setItem('gemini_speaker_profiles_v4', JSON.stringify(updated));
+                      localStorage.setItem('gemini_speaker_profiles_v4', JSON.stringify(deduped));
                     } catch {}
                     if (wsRef.current?.readyState === WebSocket.OPEN) {
-                      wsRef.current.send(JSON.stringify({ type: 'sync_speakers', profiles: updated }));
+                      wsRef.current.send(JSON.stringify({ type: 'sync_speakers', profiles: deduped }));
                     }
                   }}
                   onSelectSpeakerOverride={(mode) => {
