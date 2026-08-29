@@ -1027,6 +1027,8 @@ let lastInjectedSpeakerTurnId = -1;
     let lastSpeakerTask: Promise<any> | null = null;
     let pendingSpeechEndTimer: ReturnType<typeof setTimeout> | null = null;
     let pendingSelfIdentifiedName = '';
+    let pendingEnrollmentCandidateId = '';
+    const candidateEnrollmentEvidence = new Map<string, { hits: number; scoreSum: number; lastAt: number; promptedAt: number }>();
     let activeSpeakerTurnId = 0;
     let activeSpeakerAttribution: {
       speakerId: string | null;
