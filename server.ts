@@ -2512,7 +2512,7 @@ ${liveKnowledgeContext}`;
           lastInjectedVerifiedSpeakerId = '';
           lastInjectedVerifiedSpeakerAt = 0;
           if (activeLiveSession) {
-            sendLiveContext(activeLiveSession, `[بيانات وصفية للنظام - بداية مقطع صوتي جديد: لا تستخدم أي هوية صوتية من دور سابق. هوية المتحدث الحالي غير مؤكدة حتى تصل نتيجة VERIFIED جديدة لهذا المقطع.]`);
+            sendOrQueueLiveContext(`[بيانات وصفية للنظام - بداية مقطع صوتي جديد: لا تستخدم أي هوية صوتية من دور سابق. هوية المتحدث الحالي غير مؤكدة حتى تصل نتيجة VERIFIED جديدة لهذا المقطع.]`, 'SPEECH_START_UNKNOWN_CONTEXT');
           }
           speechEngine.beginSpeechSegment(sid);
         } else if (msg.type === 'speech_end') {
