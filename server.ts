@@ -1101,7 +1101,7 @@ async function startServer() {
       lastInjectedVerifiedSpeakerId = activeSpeakerAttribution.speakerId;
       lastInjectedVerifiedSpeakerAt = now;
       const confidencePct = Math.round((activeSpeakerAttribution.speakerConfidence || 0) * 100);
-      sendLiveContext(activeLiveSession, `[بيانات وصفية إلزامية للنظام - SPEAKER_HANDOFF v${speakerContextVersion}: المتحدث الحالي الآن هو ${activeSpeakerAttribution.speakerName} (id=${activeSpeakerAttribution.speakerId}) حسب البصمة الصوتية العصبية الموثقة، الثقة ${confidencePct}%. من هذه اللحظة خاطب هذا المتحدث باسمه الحالي فقط، ولا تستخدم اسم المتحدث السابق. إذا سألك "من أنا؟" فأجب: "أنت ${activeSpeakerAttribution.speakerName} حسب البصمة الصوتية الموثقة الآن." لا تقل إن البصمة غير مسجلة ما دامت هذه الرسالة VERIFIED.]`);
+      sendLiveContext(activeLiveSession, `[بيانات وصفية إلزامية للنظام - SPEAKER_HANDOFF v${speakerContextVersion}: المتحدث الحالي الآن هو ${activeSpeakerAttribution.speakerName} (id=${activeSpeakerAttribution.speakerId}) حسب البصمة الصوتية العصبية الموثقة، الثقة ${confidencePct}%. من هذه اللحظة خاطب هذا المتحدث بالاسم الحرفي الحالي فقط: "${activeSpeakerAttribution.speakerName}". لا تضف لقباً أو نسبة أو اسم عائلة من المشاركين أو الذاكرة أو صاحب الحساب، ولا تستخدم اسم المتحدث السابق. إذا سألك "من أنا؟" فأجب: "أنت ${activeSpeakerAttribution.speakerName} حسب البصمة الصوتية الموثقة الآن." لا تقل إن البصمة غير مسجلة ما دامت هذه الرسالة VERIFIED.]`);
       console.log('[SpeakerHandoff] Injected verified speaker context', {
         reason,
         phase,
