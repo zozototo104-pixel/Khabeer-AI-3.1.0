@@ -1095,6 +1095,60 @@ let lastInjectedSpeakerTurnId = -1;
       return transcriptFlushQueue;
     };
 
+    const maybePromptCandidateEnrollment = (diagResult: any, phase: 'PROBE' | 'FINAL') => {
+      if (!diagResult || guestConnection || !dbSessionId) return;
+      if (diagResult.identitySource !== 'CANDIDATE' || !diagResult.speakerId) return;
+      const similarity = Number(diagResult.similarity || 0);
+      if (!Number.isFinite(similarity) || similarity < 0.70) return;
+
+      const comparisons = Array.isArray(diagResult.debugInfo?.speakerComparisons)
+        ? diagResult.debugInfo.speakerComparisons
+        : [];
+      const maxRegisteredSimilarity = comparisons
+        .filter((comparison: any) => {
+          const id = String(comparison?.speakerId || '');
+          const name = String(comparison?.name || '');
+          return id && !id.startsWith('unknown_') && !id.startsWith('candidate_') && !name.includes('متحدث جديد');
+        })
+        .reduce((max: number, comparison: any) => Math.max(max, Number(comparison?.finalSimilarity ?? comparison?.similarity ?? 0)), 0);
+      if (maxRegisteredSimilarity >= 0.50) return;
+
+      const now = Date.now();
+      const previous = candidateEnrollmentEvidence.get(diagResult.speakerId);
+      const stable = previous && now - previous.lastAt <= 120_000;
+      const evidence = stable
+        ? { hits: previous.hits + 1, scoreSum: previous.scoreSum + similarity, lastAt: now, promptedAt: previous.promptedAt }
+        : { hits: 1, scoreSum: similarity, lastAt: now, promptedAt: 0 };
+      candidateEnrollmentEvidence.set(diagResult.speakerId, evidence);
+      const average = evidence.scoreSum / Math.max(1, evidence.hits);
+      if (evidence.hits < 2 || average < 0.70) return;
+      if (evidence.promptedAt && now - evidence.promptedAt < 180_000) return;
+
+      evidence.promptedAt = now;
+      candidateEnrollmentEvidence.set(diagResult.speakerId, evidence);
+      pendingEnrollmentCandidateId = diagResult.speakerId;
+      console.log('[SpeakerEnrollment] CANDIDATE_STABLE_PROMPT', {
+        candidateId: diagResult.speakerId,
+        phase,
+        similarity,
+        hits: evidence.hits,
+        average,
+        maxRegisteredSimilarity,
+      });
+      sendClientEvent({
+        type: 'speaker_candidate_enrollment_prompt',
+        candidateId: diagResult.speakerId,
+        candidateName: diagResult.name,
+        similarity,
+        hits: evidence.hits,
+        average,
+        maxRegisteredSimilarity,
+      });
+      if (activeLiveSession) {
+        sendLiveText(activeLiveSession, `[إجراء نظام مطلوب: تم اكتشاف متحدث جديد ثابت لا يطابق البصمات المسجلة. اسأله باختصار وبصوت طبيعي: "يبدو أنك متحدث جديد غير مسجل. هل ترغب بتسجيل بصمتك؟ ما اسمك الذي تريد حفظه؟" إذا وافق وذكر اسمه، استدع أداة register_voice_profile بالاسم فقط. لا تفترض الاسم من الذاكرة.]`);
+      }
+    };
+
     const publishSpeakerResult = async (diagResult: any, isCalibration = false, phase: 'PROBE' | 'FINAL' = 'FINAL') => {
       if (!diagResult) return;
       const rawSimilarity = diagResult.similarity !== undefined ? diagResult.similarity : -1;
