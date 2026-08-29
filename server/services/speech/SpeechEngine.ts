@@ -106,6 +106,7 @@ export class SpeechEngine {
   private nearRegisteredEvidence: Map<string, { speakerId: string; name: string; hits: number; scoreSum: number; lastAt: number }> = new Map();
   private speechSerial: Map<string, number> = new Map();
   private recentVerifiedProbe: Map<string, { serial: number; at: number; result: SpeakerIdentificationResult }> = new Map();
+  private lastPublishedProbe: Map<string, { serial: number; key: string; similarity: number; at: number }> = new Map();
 
   constructor() {
     this.globalRegistry = new SpeakerRegistry();
