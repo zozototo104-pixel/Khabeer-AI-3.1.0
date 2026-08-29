@@ -1301,6 +1301,8 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
     
     if (!isAiTurnInProgressRef.current) {
         nextStartTimeRef.current = 0;
+        playbackWarmupReadyRef.current = false;
+        playbackWarmupStartedAtRef.current = 0;
         bargeInConfirmedRef.current = false;
         micPreRollRef.current = [];
         if (meta?.turnId) currentAiTurnIdRef.current = meta.turnId;
