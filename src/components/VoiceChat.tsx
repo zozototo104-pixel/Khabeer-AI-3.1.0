@@ -1529,6 +1529,7 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
         inputCtx.state === 'suspended' ? inputCtx.resume() : Promise.resolve(),
         outputCtx.state === 'suspended' ? outputCtx.resume() : Promise.resolve(),
       ]);
+      await primeOutputAudioContext(outputCtx);
 
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
