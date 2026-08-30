@@ -2585,14 +2585,15 @@ ${liveKnowledgeContext}`;
         } else if (msg.type === 'speech_end') {
           const sid = dbSessionId ? String(dbSessionId) : 'global';
           if (pendingSpeechEndTimer) clearTimeout(pendingSpeechEndTimer);
+          const speechEpochAtEnd = currentSpeechEpoch;
           pendingSpeechEndTimer = setTimeout(() => {
             pendingSpeechEndTimer = null;
             try {
-              console.log('[VoiceWS] Finalizing debounced speech_end', { sid, turn: liveTurnSequence });
+              console.log('[VoiceWS] Finalizing debounced speech_end', { sid, turn: liveTurnSequence, speechEpoch: speechEpochAtEnd });
               lastSpeakerTask = speechEngine.processAudioChunk('', sid, true)
               .then(async (diagResult) => {
                 if (!diagResult) return null;
-                await publishSpeakerResult(diagResult, Boolean(msg.isCalibration), 'FINAL');
+                await publishSpeakerResult(diagResult, Boolean(msg.isCalibration), 'FINAL', speechEpochAtEnd);
                 if (!guestConnection
                   && pendingSelfIdentifiedName
                   && pendingEnrollmentCandidateId
