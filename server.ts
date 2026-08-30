@@ -677,6 +677,62 @@ async function extractPdfWithVerifiedOcr(
     await fs.rm(tempDir, { recursive: true, force: true }).catch(() => undefined);
   }
 }
+function cleanTranscriptLine(line: string): string {
+  return String(line || '')
+    .replace(/^[^:：]{1,80}[:：]\s*/u, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function dedupeMeetingTasks(items: any[], limit = 30): any[] {
+  const seen = new Set<string>();
+  const output: any[] = [];
+  for (const item of items) {
+    if (!item || !item.title) continue;
+    const key = `${String(item.assignee || 'غير محدد').trim()}|${String(item.title || '').trim()}`.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    output.push(item);
+    if (output.length >= limit) break;
+  }
+  return output;
+}
+
+function extractNamedAssignmentsFromTranscript(transcript: string, limit = 25): any[] {
+  const lines = String(transcript || '').split('\n').map(l => l.trim()).filter(Boolean);
+  const assignments: any[] = [];
+  const name = '([\\p{Script=Arabic}A-Za-z][\\p{Script=Arabic}A-Za-z\\s]{1,42}?)';
+  const action = '([^\\n.؟!؛]{3,220})';
+  const patterns = [
+    new RegExp(`(?:تم\\s+)?(?:تكليف|نكلّف|نكلف|تقرر\\s+تكليف|يُكلف|يكلف)\\s+${name}\\s+(?:ب|بـ|ل|على|أن|ان)?\\s*${action}`, 'iu'),
+    new RegExp(`${name}\\s+(?:مكلّف|مكلف|مسؤول|مسؤولة|مسؤول\\s+عن|مسؤولة\\s+عن)\\s+(?:ب|بـ|عن|أن|ان)?\\s*${action}`, 'iu'),
+    new RegExp(`(?:على|يتولى|تتولى)\\s+${name}\\s+${action}`, 'iu'),
+  ];
+
+  for (const raw of lines) {
+    const clean = cleanTranscriptLine(raw);
+    if (clean.length < 8) continue;
+    for (const pattern of patterns) {
+      const match = clean.match(pattern);
+      if (!match) continue;
+      const assignee = String(match[1] || '').replace(/^(الأستاذ|الاستاذ|الأخت|الاخ|الأخ|السيدة|السيد)\s+/u, '').trim();
+      const taskText = String(match[2] || '').replace(/^[:：\-\s]+/u, '').trim();
+      if (!assignee || assignee.length < 2 || !taskText || taskText.length < 3) continue;
+      assignments.push({
+        title: taskText.length > 90 ? `${taskText.slice(0, 87)}...` : taskText,
+        description: taskText,
+        assignee,
+        status: 'PENDING',
+        dueDate: '',
+        sourceText: clean,
+        sourceType: 'EXPLICIT_NAME',
+      });
+      break;
+    }
+  }
+  return dedupeMeetingTasks(assignments, limit);
+}
+
 // Intelligent heuristic extractor when AI service is unavailable
 function extractHeuristicallyFromTranscript(transcript: string) {
   const lines = transcript.split('\n').map(l => l.trim()).filter(Boolean);
