@@ -5272,7 +5272,7 @@ ${transcript}
         parsed = JSON.parse(response.text || '{}');
         // Ledger entries remain authoritative. AI may improve only narrative
         // fields; it cannot silently add or alter official meeting items.
-        const draftAssignments = Array.isArray(parsed?.draftAssignments)
+        const aiDraftAssignments = Array.isArray(parsed?.draftAssignments)
           ? parsed.draftAssignments
               .filter((item: any) => item && (item.title || item.description || item.assignee))
               .slice(0, 30)
@@ -5287,6 +5287,10 @@ ${transcript}
                 isDraftAssignment: true,
               }))
           : [];
+        const draftAssignments = dedupeMeetingTasks([
+          ...deterministicDraftAssignments,
+          ...aiDraftAssignments,
+        ], 30);
         parsed.decisions = authoritativeData.decisions;
         parsed.draftAssignments = draftAssignments;
         parsed.tasks = [
