@@ -5254,6 +5254,7 @@ ${transcript}
         payload: {
           decisionCount: Array.isArray(parsed?.decisions) ? parsed.decisions.length : 0,
           taskCount: Array.isArray(parsed?.tasks) ? parsed.tasks.length : 0,
+          draftAssignmentCount: Array.isArray(parsed?.draftAssignments) ? parsed.draftAssignments.length : 0,
           riskCount: Array.isArray(parsed?.risks) ? parsed.risks.length : 0,
           violationCount: Array.isArray(parsed?.violations) ? parsed.violations.length : 0,
           findingCount: Array.isArray(parsed?.findings) ? parsed.findings.length : 0,
