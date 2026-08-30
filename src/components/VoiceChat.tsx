@@ -495,6 +495,23 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
   }, [speakerProfiles]);
 
   useEffect(() => {
+    if (conversationState !== 'AI_SPEAKING') return;
+    const timer = window.setTimeout(() => {
+      if (
+        conversationStateRef.current === 'AI_SPEAKING'
+        && !isAiTurnInProgressRef.current
+        && audioQueueRef.current.length === 0
+        && sourcesRef.current.length === 0
+      ) {
+        setIsSpeaking(false);
+        setConversationState(isConnected ? 'LISTENING' : 'IDLE');
+        addDebugLog('[PLAYBACK_STATE_FIX] Cleared stale AI_SPEAKING while audio pipeline is IDLE');
+      }
+    }, 900);
+    return () => window.clearTimeout(timer);
+  }, [conversationState, isConnected, addDebugLog]);
+
+  useEffect(() => {
     if (!token) return;
     fetch('/api/experts', { headers: { Authorization: `Bearer ${token}` } })
       .then((response) => response.ok ? response.json() : Promise.reject(new Error('EXPERT_CATALOG_UNAVAILABLE')))
