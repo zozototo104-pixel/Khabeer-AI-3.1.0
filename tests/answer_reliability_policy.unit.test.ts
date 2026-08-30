@@ -58,4 +58,17 @@ test('requires internal/source separation, citation use, and conflict handling w
   assert.match(instruction, /التوصية العملية: اكتب هذا العنوان صراحة/);
   assert.match(instruction, /درجة الثقة: اكتب هذا العنوان صراحة/);
   assert.match(instruction, /لا تعتبر الإجابة القانونية\/الهندسية\/الرقابية\/المالية مكتملة/);
+  assert.match(instruction, /مدقق داخلي صامت قبل الجواب النهائي/);
+});
+
+test('detects professional deliverable templates and requires structured output', () => {
+  const profile = buildAnswerReliabilityProfile('اكتب لي تقرير مخالفة وفق اللائحة', '');
+  assert.equal(profile.deliverableTemplate, 'VIOLATION_REPORT');
+  assert.equal(profile.depth, 'ANALYTICAL');
+  assert.equal(profile.requiresInternalEvidence, true);
+
+  const instruction = buildAnswerReliabilityInstruction('اكتب لي تقرير مخالفة وفق اللائحة', '');
+  assert.match(instruction, /قالب تقرير مخالفة/);
+  assert.match(instruction, /ملخص المخالفة المشتبه بها/);
+  assert.match(instruction, /درجة الثقة وحاجة المراجعة البشرية/);
 });
