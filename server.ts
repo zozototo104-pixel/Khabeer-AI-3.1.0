@@ -2547,6 +2547,22 @@ ${liveKnowledgeContext}`;
           };
           lastInjectedVerifiedSpeakerId = '';
           lastInjectedVerifiedSpeakerAt = 0;
+          if (clientWs.readyState === clientWs.OPEN) {
+            clientWs.send(JSON.stringify({
+              type: 'speaker_identified',
+              phase: 'SPEECH_START',
+              speakerId: null,
+              speakerName: 'متحدث غير معروف',
+              similarity: 0,
+              confidence: 'LOW',
+              isNewCandidate: false,
+              identitySource: 'UNKNOWN',
+              debugInfo: {
+                turnId: liveTurnSequence,
+                segmentId: 'speech_start',
+              },
+            }));
+          }
           if (activeLiveSession) {
             sendOrQueueLiveContext(`[بيانات وصفية للنظام - بداية مقطع صوتي جديد: لا تستخدم أي هوية صوتية من دور سابق. هوية المتحدث الحالي غير مؤكدة حتى تصل نتيجة VERIFIED جديدة لهذا المقطع.]`, 'SPEECH_START_UNKNOWN_CONTEXT');
           }
