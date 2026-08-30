@@ -187,7 +187,7 @@ export class MemoryEngine {
         openRecommendations.forEach((rec) => {
           payload += `- ${rec.title} (الحالة: ${rec.status || 'RECOMMENDED'})\n`;
           if (rec.description) payload += `  التوصية: ${rec.description}\n`;
-          if (rec.owner || rec.dueDate) payload += `  المتابعة: ${rec.owner || 'غير محدد'}${rec.dueDate ? `، حتى ${new Date(rec.dueDate).toISOString().slice(0, 10)}` : ''}\n`;
+          if (rec.sessionId) payload += `  مرتبطة بالجلسة رقم: ${rec.sessionId}\n`;
         });
       }
 
