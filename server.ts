@@ -756,8 +756,10 @@ function extractHeuristicallyFromTranscript(transcript: string) {
         status: isApprovedDecision ? 'APPROVED' : 'RECOMMENDED'
       });
     }
-    // Task detection
-    if (/مهمة|تكليف|مطلوب|متابعة|إعداد|مراجعة|تجهيز|تدقيق|رفع تقرير|تنفيذ/i.test(clean)) {
+    // Generic task detection is a fallback only. Named assignments are extracted
+    // deterministically above and should not be overwritten by "غير محدد" rows.
+    const hasNamedAssignment = extractNamedAssignmentsFromTranscript(clean, 1).length > 0;
+    if (!hasNamedAssignment && /مهمة|تكليف|مطلوب|متابعة|إعداد|مراجعة|تجهيز|تدقيق|رفع تقرير|تنفيذ/i.test(clean)) {
       tasks.push({
         title: clean.length > 60 ? clean.substring(0, 57) + '...' : clean,
         assignee: 'غير محدد',
