@@ -1772,8 +1772,14 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
   similarity: typeof msg.similarity === 'number' ? msg.similarity : 0,
 });
             // Stale/Overwrite protection: 
-            // Do NOT let a weak PROBE or UNKNOWN FINAL overwrite an already VERIFIED speaker in the UI for this turn
-            if (isVerified) {
+            // Do NOT let a weak PROBE or UNKNOWN FINAL overwrite an already VERIFIED speaker in the UI for this turn.
+            // A new speech boundary is different: clear the previous speaker immediately so
+            // the UI/assistant does not keep showing or implying the last verified speaker.
+            if (msg.phase === 'SPEECH_START') {
+                setActiveSpeakerId(null);
+                setActiveSpeakerName('متحدث غير معروف');
+                setCurrentSimilarity(0);
+            } else if (isVerified) {
                 setActiveSpeakerId(msg.speakerId || null);
                 setActiveSpeakerName(msg.speakerName || 'متحدث غير معروف');
                 if (msg.similarity !== undefined) {
