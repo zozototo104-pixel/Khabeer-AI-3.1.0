@@ -303,9 +303,18 @@ export class SpeechEngine {
       const lastProbe = this.lastProbeAt.get(sessionId) || 0;
       if (enoughAudio && Date.now() - lastProbe >= 1200 && !this.probeInFlight.has(sessionId)) {
         this.lastProbeAt.set(sessionId, Date.now());
-        const probe = diarizer.probeActiveSegment().finally(() => this.probeInFlight.delete(sessionId));
+        const probeSerialAtStart = this.speechSerial.get(sessionId) || 0;
+        const probe = diarizer.probeActiveSegment().finally(() => {
+          if (this.probeInFlight.get(sessionId) === probe) {
+            this.probeInFlight.delete(sessionId);
+          }
+        });
         this.probeInFlight.set(sessionId, probe);
         const result = await probe;
+        if ((this.speechSerial.get(sessionId) || 0) !== probeSerialAtStart) {
+          diarizer['callbacks']?.onDebugLog?.(`[Speaker:ProbeStaleIgnored] startedSerial=${probeSerialAtStart} currentSerial=${this.speechSerial.get(sessionId) || 0}`);
+          return null;
+        }
         
         const corroboratedProbe = this.corroborateNearRegisteredMatch(result, sessionId) || result;
         // Log the probe result for diagnostic purposes
