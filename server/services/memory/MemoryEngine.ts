@@ -166,6 +166,46 @@ export class MemoryEngine {
         });
       }
 
+      payload += `\n=== سجل المخاطر المفتوحة والمتابعة المطلوبة ===\n`;
+      if (openRisks.length === 0) {
+        payload += `- لا توجد مخاطر مفتوحة مسجلة حالياً.\n`;
+      } else {
+        openRisks.forEach((risk) => {
+          const level = risk.riskLevel || risk.severity || 'غير مصنف';
+          payload += `- ${risk.title} (المستوى: ${level}، الحالة: ${risk.status || 'OPEN'})\n`;
+          if (risk.description) payload += `  الوصف: ${risk.description}\n`;
+          if (risk.regulationRef) payload += `  المرجع/الضابط: ${risk.regulationRef}\n`;
+          if (risk.owner || risk.dueDate) payload += `  المتابعة: ${risk.owner || 'غير محدد'}${risk.dueDate ? `، حتى ${new Date(risk.dueDate).toISOString().slice(0, 10)}` : ''}\n`;
+        });
+      }
+
+      payload += `\n=== مخالفات أو شبهات مخالفة مفتوحة ===\n`;
+      if (openViolations.length === 0) {
+        payload += `- لا توجد مخالفات مفتوحة مسجلة حالياً.\n`;
+      } else {
+        openViolations.forEach((violation) => {
+          const confidence = typeof violation.confidence === 'number' ? `${Math.round(violation.confidence * 100)}%` : 'غير محددة';
+          payload += `- ${violation.title} (الشدة: ${violation.severity || 'MEDIUM'}، الحالة: ${violation.status || 'SUSPECTED'}، الثقة: ${confidence})\n`;
+          if (violation.regulationTitle || violation.articleNumber || violation.regulationRef) {
+            payload += `  السند: ${[violation.regulationTitle, violation.articleNumber ? `المادة ${violation.articleNumber}` : '', violation.regulationRef].filter(Boolean).join(' - ')}\n`;
+          }
+          if (violation.factualEvidence) payload += `  الدليل الواقعي: ${violation.factualEvidence}\n`;
+          if (violation.correctiveAction) payload += `  الإجراء التصحيحي: ${violation.correctiveAction}\n`;
+        });
+      }
+
+      payload += `\n=== ملاحظات الخبراء المفتوحة ===\n`;
+      if (openFindings.length === 0) {
+        payload += `- لا توجد ملاحظات خبراء مفتوحة حالياً.\n`;
+      } else {
+        openFindings.forEach((finding) => {
+          const confidence = typeof finding.confidence === 'number' ? `${Math.round(finding.confidence * 100)}%` : 'غير محددة';
+          payload += `- ${finding.title} (النوع: ${finding.findingType || 'عام'}، الشدة: ${finding.severity || 'INFO'}، الثقة: ${confidence})\n`;
+          if (finding.description) payload += `  الوصف: ${finding.description}\n`;
+          if (finding.evidence) payload += `  الدليل: ${finding.evidence}\n`;
+        });
+      }
+
       return payload;
     } catch (e) {
       console.error("Error fetching contextual memory:", e);
