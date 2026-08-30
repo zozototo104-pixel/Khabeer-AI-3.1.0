@@ -2574,6 +2574,7 @@ ${liveKnowledgeContext}`;
               debugInfo: {
                 turnId: liveTurnSequence,
                 segmentId: 'speech_start',
+                speechEpoch: currentSpeechEpoch,
               },
             }));
           }
