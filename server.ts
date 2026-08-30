@@ -5233,6 +5233,7 @@ ${transcript}
           agenda: currentData?.agenda || '',
           decisions: authoritativeData.decisions,
           tasks: authoritativeData.tasks,
+          draftAssignments: [],
           risks: authoritativeData.risks,
           violations: authoritativeData.violations,
           findings: authoritativeData.findings,
