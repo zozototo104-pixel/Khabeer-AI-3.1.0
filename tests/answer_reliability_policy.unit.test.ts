@@ -55,4 +55,7 @@ test('requires internal/source separation, citation use, and conflict handling w
   assert.match(instruction, /الأولوية للملفات الداخلية/);
   assert.match(instruction, /\[م1\] دليل مسترجع: لائحة الاختبار، الصفحة 12، score=91/);
   assert.match(instruction, /وفق \[م1\]/);
+  assert.match(instruction, /التوصية العملية: اكتب هذا العنوان صراحة/);
+  assert.match(instruction, /درجة الثقة: اكتب هذا العنوان صراحة/);
+  assert.match(instruction, /لا تعتبر الإجابة القانونية\/الهندسية\/الرقابية\/المالية مكتملة/);
 });
