@@ -2680,8 +2680,9 @@ ${liveKnowledgeContext}`;
         } else if (msg.audio) {
           try {
             const sid = dbSessionId ? String(dbSessionId) : 'global';
+            const speechEpochAtSubmit = currentSpeechEpoch;
             speechEngine.processAudioChunk(msg.audio, sid, false)
-              .then((diagResult) => publishSpeakerResult(diagResult, Boolean(msg.isCalibration), 'PROBE'))
+              .then((diagResult) => publishSpeakerResult(diagResult, Boolean(msg.isCalibration), 'PROBE', speechEpochAtSubmit))
               .catch(e => console.error("Speaker processing error:", e));
           } catch(e) {}
           if (activeLiveSession) {
