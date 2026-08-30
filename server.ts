@@ -737,7 +737,7 @@ function extractNamedAssignmentsFromTranscript(transcript: string, limit = 25): 
 function extractHeuristicallyFromTranscript(transcript: string) {
   const lines = transcript.split('\n').map(l => l.trim()).filter(Boolean);
   const decisions: any[] = [];
-  const tasks: any[] = [];
+  const tasks: any[] = extractNamedAssignmentsFromTranscript(transcript);
   const risks: any[] = [];
   const violations: any[] = [];
   const findings: any[] = [];
