@@ -5202,8 +5202,27 @@ ${transcript}
         parsed = JSON.parse(response.text || '{}');
         // Ledger entries remain authoritative. AI may improve only narrative
         // fields; it cannot silently add or alter official meeting items.
+        const draftAssignments = Array.isArray(parsed?.draftAssignments)
+          ? parsed.draftAssignments
+              .filter((item: any) => item && (item.title || item.description || item.assignee))
+              .slice(0, 30)
+              .map((item: any) => ({
+                title: String(item.title || item.description || 'تكليف مستخرج من نص الاجتماع').slice(0, 300),
+                description: String(item.description || item.sourceText || '').slice(0, 1000),
+                assignee: String(item.assignee || 'غير محدد').slice(0, 120),
+                dueDate: item.dueDate ? String(item.dueDate).slice(0, 80) : '',
+                status: 'DRAFT_REVIEW',
+                sourceText: String(item.sourceText || '').slice(0, 1000),
+                sourceType: String(item.sourceType || 'EXPLICIT_NAME').slice(0, 80),
+                isDraftAssignment: true,
+              }))
+          : [];
         parsed.decisions = authoritativeData.decisions;
-        parsed.tasks = authoritativeData.tasks;
+        parsed.draftAssignments = draftAssignments;
+        parsed.tasks = [
+          ...authoritativeData.tasks,
+          ...draftAssignments,
+        ];
         parsed.risks = authoritativeData.risks;
         parsed.violations = authoritativeData.violations;
         parsed.findings = authoritativeData.findings;
