@@ -5306,8 +5306,11 @@ ${transcript}
           summary: currentData?.summary || 'تعذر توليد الملخص الآلي؛ راجع نص الاجتماع المسجل قبل اعتماد المحضر.',
           agenda: currentData?.agenda || '',
           decisions: authoritativeData.decisions,
-          tasks: authoritativeData.tasks,
-          draftAssignments: [],
+          tasks: [
+            ...authoritativeData.tasks,
+            ...deterministicDraftAssignments,
+          ],
+          draftAssignments: deterministicDraftAssignments,
           risks: authoritativeData.risks,
           violations: authoritativeData.violations,
           findings: authoritativeData.findings,
