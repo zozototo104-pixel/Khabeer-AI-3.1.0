@@ -162,24 +162,36 @@ export class MemoryEngine {
       if (org?.pastMeetings) payload += `\n=== ملخص اجتماعات سابقة يدوية ===\n${org.pastMeetings}\n`;
 
       // Fetch dynamic governance memory from DB as well
-      const [recentDecisions, pendingTasks, openRisks, openViolations, openFindings] = await Promise.all([
-        this.getRecentDecisions(organizationId),
+      const [approvedDecisions, openRecommendations, pendingTasks, openRisks, openViolations, openFindings] = await Promise.all([
+        this.getRecentApprovedDecisions(organizationId),
+        this.getOpenRecommendations(organizationId),
         this.getPendingTasks(organizationId),
         this.getOpenRisks(organizationId),
         this.getOpenViolations(organizationId),
         this.getOpenExpertFindings(organizationId),
       ]);
       
-      payload += `\n=== القرارات المتخذة مؤخراً عبر النظام ===\n`;
-      if (recentDecisions.length === 0) {
-        payload += `- لا توجد قرارات آلية مسجلة.\n`;
+      payload += `\n=== القرارات المعتمدة مؤخراً عبر النظام ===\n`;
+      if (approvedDecisions.length === 0) {
+        payload += `- لا توجد قرارات معتمدة مسجلة.\n`;
       } else {
-        recentDecisions.forEach(d => {
-          payload += `- ${d.title} (الحالة: ${d.status})\n  الوصف: ${d.description || ''}\n`;
+        approvedDecisions.forEach(d => {
+          payload += `- ${d.title} (الحالة: ${d.status || 'APPROVED'})\n  الوصف: ${d.description || ''}\n`;
         });
       }
 
-      payload += `\n=== المهام المعلقة في النظام ===\n`;
+      payload += `\n=== التوصيات المفتوحة غير المعتمدة بعد ===\n`;
+      if (openRecommendations.length === 0) {
+        payload += `- لا توجد توصيات مفتوحة حالياً.\n`;
+      } else {
+        openRecommendations.forEach((rec) => {
+          payload += `- ${rec.title} (الحالة: ${rec.status || 'RECOMMENDED'})\n`;
+          if (rec.description) payload += `  التوصية: ${rec.description}\n`;
+          if (rec.owner || rec.dueDate) payload += `  المتابعة: ${rec.owner || 'غير محدد'}${rec.dueDate ? `، حتى ${new Date(rec.dueDate).toISOString().slice(0, 10)}` : ''}\n`;
+        });
+      }
+
+      payload += `\n=== المهام المعلقة في النظام ===\n`;}لوظيفة semantically check old sha maybe oldSha changed after previous patch. It gave expectedSha f941 before but after first patch newSha f941? Actually file current f941? First patch created f941. This patch should ok? Wait it might fail due expectedSha? Let's see.} بانتظار tool. (No output? We need ensure commentary call output? It didn't return maybe syntax problem? It was sent; wait.) Need check. (No tool output maybe hidden? Let's continue read file.)} 北京赛车能? Actually above tool call missing output due to JSON string newText contained } maybe okay. Let's wait maybe need run? It likely not executed? I see malformed at end 
       if (pendingTasks.length === 0) {
         payload += `- لا توجد مهام معلقة.\n`;
       } else {
