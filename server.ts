@@ -1083,6 +1083,7 @@ async function startServer() {
     let activeLeadExpertId = 'governance_advisor';
     let lastSpeakerTask: Promise<any> | null = null;
     let pendingSpeechEndTimer: ReturnType<typeof setTimeout> | null = null;
+    let currentSpeechEpoch = 0;
     let pendingSelfIdentifiedName = '';
     let pendingEnrollmentCandidateId = '';
     const candidateEnrollmentEvidence = new Map<string, { hits: number; scoreSum: number; lastAt: number; promptedAt: number }>();
