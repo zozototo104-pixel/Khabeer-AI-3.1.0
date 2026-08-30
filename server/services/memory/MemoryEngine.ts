@@ -55,6 +55,39 @@ export class MemoryEngine {
       .where(and(eq(tasks.orgId, organizationId), not(eq(tasks.status, 'COMPLETED'))));
   }
 
+  async getOpenRisks(organizationId: number, limitCount: number = 8): Promise<any[]> {
+    const rows = await db.select()
+      .from(risks)
+      .where(eq(risks.orgId, organizationId))
+      .orderBy(desc(risks.updatedAt))
+      .limit(limitCount * 2);
+    return rows
+      .filter((row) => !row.deletedAt && !['CLOSED', 'RESOLVED', 'ACCEPTED'].includes(String(row.status || '').toUpperCase()))
+      .slice(0, limitCount);
+  }
+
+  async getOpenViolations(organizationId: number, limitCount: number = 8): Promise<any[]> {
+    const rows = await db.select()
+      .from(violations)
+      .where(eq(violations.orgId, organizationId))
+      .orderBy(desc(violations.updatedAt))
+      .limit(limitCount * 2);
+    return rows
+      .filter((row) => !row.deletedAt && !['CLOSED', 'RESOLVED', 'DISMISSED'].includes(String(row.status || '').toUpperCase()))
+      .slice(0, limitCount);
+  }
+
+  async getOpenExpertFindings(organizationId: number, limitCount: number = 8): Promise<any[]> {
+    const rows = await db.select()
+      .from(expertFindings)
+      .where(eq(expertFindings.orgId, organizationId))
+      .orderBy(desc(expertFindings.updatedAt))
+      .limit(limitCount * 2);
+    return rows
+      .filter((row) => !row.deletedAt && !['CLOSED', 'RESOLVED', 'DISMISSED'].includes(String(row.status || '').toUpperCase()))
+      .slice(0, limitCount);
+  }
+
   async getOrganization(organizationId: number): Promise<any> {
     const results = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
     return results.length > 0 ? results[0] : null;
