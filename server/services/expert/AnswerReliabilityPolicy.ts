@@ -11,6 +11,14 @@ export interface AnswerReliabilityProfile {
   confidenceHint: 'HIGH' | 'MEDIUM' | 'LOW';
 }
 
+export interface InternalCitationHint {
+  id: string;
+  title: string;
+  page?: string;
+  score?: string;
+  kind: 'EVIDENCE' | 'ARTICLE' | 'ANNEX' | 'EXCERPT';
+}
+
 const normalize = (value: string): string => String(value || '')
   .replace(/[إأآا]/g, 'ا')
   .replace(/ى/g, 'ي')
