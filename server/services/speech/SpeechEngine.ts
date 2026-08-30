@@ -554,6 +554,14 @@ export class SpeechEngine {
     this.lastProbeAt.set(sessionId, 0);
     const nextSerial = (this.speechSerial.get(sessionId) || 0) + 1;
     this.speechSerial.set(sessionId, nextSerial);
+    // A slow embedding/probe from the previous speech burst must not block the
+    // first probe of the new burst. We intentionally release the in-flight gate
+    // here; the old promise is still guarded by speechSerial and will be ignored
+    // when it resolves if it belongs to an older burst.
+    if (this.probeInFlight.has(sessionId)) {
+      this.probeInFlight.delete(sessionId);
+      diarizer['callbacks']?.onDebugLog?.(`[Speaker:ProbeGateReleased] newSerial=${nextSerial}`);
+    }
     // SECTION B FIX (regression): previously this called
     // `this.liveEvidence.delete(sessionId)` on every speech_start, which
     // also fires on VAD micro-pauses (breaths between sentences). That
