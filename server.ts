@@ -5210,6 +5210,11 @@ console.log('✅ Tasks database schema is ready.');
         const speaker = message.isUser ? (message.speakerName || 'متحدث غير معروف') : 'الخبير';
         return `${speaker}: ${message.text}`;
       }).join('\n').slice(-40_000);
+      const deterministicDraftAssignments = extractNamedAssignmentsFromTranscript(transcript).map((item) => ({
+        ...item,
+        status: 'DRAFT_REVIEW',
+        isDraftAssignment: true,
+      }));
       const apiKey = process.env.GEMINI_API_KEY;
 
       const prompt = `أنت أمين سر ومستشار حوكمة خبير. بناءً على بيانات محضر الاجتماع التالية:
