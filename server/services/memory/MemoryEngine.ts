@@ -118,7 +118,7 @@ export class MemoryEngine {
   async getOrganizationByOwner(ownerId: string): Promise<any> {
     const results = await db.select().from(organizations)
       .where(eq(organizations.ownerId, ownerId))
-      .orderBy(desc(organizations.updatedAt)) // Get the most recently created one
+      .orderBy(desc(organizations.updatedAt))
       .limit(1);
     
     if (results.length > 0) {
@@ -161,7 +161,6 @@ export class MemoryEngine {
       if (org?.pastDecisions) payload += `\n=== قرارات سابقة مسجلة يدوياً ===\n${org.pastDecisions}\n`;
       if (org?.pastMeetings) payload += `\n=== ملخص اجتماعات سابقة يدوية ===\n${org.pastMeetings}\n`;
 
-      // Fetch dynamic governance memory from DB as well
       const [approvedDecisions, openRecommendations, pendingTasks, openRisks, openViolations, openFindings] = await Promise.all([
         this.getRecentApprovedDecisions(organizationId),
         this.getOpenRecommendations(organizationId),
@@ -175,8 +174,9 @@ export class MemoryEngine {
       if (approvedDecisions.length === 0) {
         payload += `- لا توجد قرارات معتمدة مسجلة.\n`;
       } else {
-        approvedDecisions.forEach(d => {
-          payload += `- ${d.title} (الحالة: ${d.status || 'APPROVED'})\n  الوصف: ${d.description || ''}\n`;
+        approvedDecisions.forEach((decision) => {
+          payload += `- ${decision.title} (الحالة: ${decision.status || 'APPROVED'})\n`;
+          if (decision.description) payload += `  الوصف: ${decision.description}\n`;
         });
       }
 
@@ -184,19 +184,20 @@ export class MemoryEngine {
       if (openRecommendations.length === 0) {
         payload += `- لا توجد توصيات مفتوحة حالياً.\n`;
       } else {
-        openRecommendations.forEach((rec) => {
-          payload += `- ${rec.title} (الحالة: ${rec.status || 'RECOMMENDED'})\n`;
-          if (rec.description) payload += `  التوصية: ${rec.description}\n`;
-          if (rec.sessionId) payload += `  مرتبطة بالجلسة رقم: ${rec.sessionId}\n`;
+        openRecommendations.forEach((recommendation) => {
+          payload += `- ${recommendation.title} (الحالة: ${recommendation.status || 'RECOMMENDED'})\n`;
+          if (recommendation.description) payload += `  التوصية: ${recommendation.description}\n`;
+          if (recommendation.sessionId) payload += `  مرتبطة بالجلسة رقم: ${recommendation.sessionId}\n`;
         });
       }
 
-      payload += `\n=== المهام المعلقة في النظام ===\n`;}لوظيفة semantically check old sha maybe oldSha changed after previous patch. It gave expectedSha f941 before but after first patch newSha f941? Actually file current f941? First patch created f941. This patch should ok? Wait it might fail due expectedSha? Let's see.} بانتظار tool. (No output? We need ensure commentary call output? It didn't return maybe syntax problem? It was sent; wait.) Need check. (No tool output maybe hidden? Let's continue read file.)} 北京赛车能? Actually above tool call missing output due to JSON string newText contained } maybe okay. Let's wait maybe need run? It likely not executed? I see malformed at end 
+      payload += `\n=== المهام المعلقة في النظام ===\n`;
       if (pendingTasks.length === 0) {
         payload += `- لا توجد مهام معلقة.\n`;
       } else {
-        pendingTasks.forEach(t => {
-          payload += `- ${t.title} (المسؤول: ${t.assignee || 'غير محدد'})\n`;
+        pendingTasks.forEach((task) => {
+          payload += `- ${task.title} (المسؤول: ${task.assignee || 'غير محدد'}، الحالة: ${task.status || 'PENDING'})\n`;
+          if (task.description) payload += `  الوصف: ${task.description}\n`;
         });
       }
 
@@ -209,7 +210,10 @@ export class MemoryEngine {
           payload += `- ${risk.title} (المستوى: ${level}، الحالة: ${risk.status || 'OPEN'})\n`;
           if (risk.description) payload += `  الوصف: ${risk.description}\n`;
           if (risk.regulationRef) payload += `  المرجع/الضابط: ${risk.regulationRef}\n`;
-          if (risk.owner || risk.dueDate) payload += `  المتابعة: ${risk.owner || 'غير محدد'}${risk.dueDate ? `، حتى ${new Date(risk.dueDate).toISOString().slice(0, 10)}` : ''}\n`;
+          if (risk.owner || risk.dueDate) {
+            const due = risk.dueDate ? `، حتى ${new Date(risk.dueDate).toISOString().slice(0, 10)}` : '';
+            payload += `  المتابعة: ${risk.owner || 'غير محدد'}${due}\n`;
+          }
         });
       }
 
