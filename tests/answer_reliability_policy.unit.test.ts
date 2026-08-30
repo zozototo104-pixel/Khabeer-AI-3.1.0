@@ -69,6 +69,30 @@ test('detects professional deliverable templates and requires structured output'
 
   const instruction = buildAnswerReliabilityInstruction('اكتب لي تقرير مخالفة وفق اللائحة', '');
   assert.match(instruction, /قالب تقرير مخالفة/);
-  assert.match(instruction, /ملخص المخالفة المشتبه بها/);
+  assert.match(instruction, /ملخص تنفيذي للمخالفة/);
+  assert.match(instruction, /التكليفات: المسؤول، المهمة، تاريخ الاستحقاق/);
   assert.match(instruction, /درجة الثقة وحاجة المراجعة البشرية/);
+});
+
+test('meeting minutes template captures named assignments scientifically', () => {
+  const profile = buildAnswerReliabilityProfile('أعد محضر اجتماع واذكر أن محمد مكلف بمتابعة العقد', '');
+  assert.equal(profile.deliverableTemplate, 'MEETING_MINUTES');
+  const instruction = buildAnswerReliabilityInstruction('أعد محضر اجتماع واذكر أن محمد مكلف بمتابعة العقد', '');
+  assert.match(instruction, /قالب محضر اجتماع علمي قابل للتنفيذ/);
+  assert.match(instruction, /التكليفات والمهام في جدول إلزامي/);
+  assert.match(instruction, /إذا قيل "محمد مكلف بكذا"/);
+  assert.match(instruction, /مستنتج من السياق/);
+});
+
+test('regulatory audit report template requires SWOT KPIs compliance matrix and charts', () => {
+  const profile = buildAnswerReliabilityProfile('أريد تقرير رقابي مفصل عن التقرير الشهري وفق اللائحة والخطة', '');
+  assert.equal(profile.deliverableTemplate, 'REGULATORY_AUDIT_REPORT');
+  assert.equal(profile.depth, 'ANALYTICAL');
+  const instruction = buildAnswerReliabilityInstruction('أريد تقرير رقابي مفصل عن التقرير الشهري وفق اللائحة والخطة', '');
+  assert.match(instruction, /قالب تقرير رقابي\/شهري تفصيلي علمي/);
+  assert.match(instruction, /مصفوفة الامتثال/);
+  assert.match(instruction, /تحليل الأداء ومؤشرات KPI/);
+  assert.match(instruction, /تحليل SWOT منظم/);
+  assert.match(instruction, /الرسوم والجداول/);
+  assert.match(instruction, /وفق اللائحة كذا والخطة كذا/);
 });
