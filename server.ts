@@ -2593,6 +2593,15 @@ ${liveKnowledgeContext}`;
               lastSpeakerTask = speechEngine.processAudioChunk('', sid, true)
               .then(async (diagResult) => {
                 if (!diagResult) return null;
+                if (speechEpochAtEnd !== currentSpeechEpoch) {
+                  console.log('[SPEAKER_STALE_FINAL_SIDE_EFFECTS_SKIPPED]', {
+                    speechEpochAtEnd,
+                    currentSpeechEpoch,
+                    rawSpeaker: diagResult.name || 'UNKNOWN',
+                    segmentId: diagResult.debugInfo?.segmentId || '?',
+                  });
+                  return null;
+                }
                 await publishSpeakerResult(diagResult, Boolean(msg.isCalibration), 'FINAL', speechEpochAtEnd);
                 if (!guestConnection
                   && pendingSelfIdentifiedName
