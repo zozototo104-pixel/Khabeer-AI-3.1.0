@@ -49,6 +49,28 @@ export class MemoryEngine {
       .limit(limitCount);
   }
 
+  async getRecentApprovedDecisions(organizationId: number, limitCount: number = 5): Promise<any[]> {
+    const rows = await db.select()
+      .from(decisions)
+      .where(eq(decisions.orgId, organizationId))
+      .orderBy(desc(decisions.createdAt))
+      .limit(limitCount * 3);
+    return rows
+      .filter((row) => String(row.status || '').toUpperCase() !== 'RECOMMENDED')
+      .slice(0, limitCount);
+  }
+
+  async getOpenRecommendations(organizationId: number, limitCount: number = 8): Promise<any[]> {
+    const rows = await db.select()
+      .from(decisions)
+      .where(eq(decisions.orgId, organizationId))
+      .orderBy(desc(decisions.createdAt))
+      .limit(limitCount * 3);
+    return rows
+      .filter((row) => ['RECOMMENDED', 'PROPOSED', 'PENDING_REVIEW'].includes(String(row.status || '').toUpperCase()))
+      .slice(0, limitCount);
+  }
+
   async getPendingTasks(organizationId: number): Promise<any[]> {
     return await db.select()
       .from(tasks)
