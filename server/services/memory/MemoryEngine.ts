@@ -139,9 +139,14 @@ export class MemoryEngine {
       if (org?.pastDecisions) payload += `\n=== قرارات سابقة مسجلة يدوياً ===\n${org.pastDecisions}\n`;
       if (org?.pastMeetings) payload += `\n=== ملخص اجتماعات سابقة يدوية ===\n${org.pastMeetings}\n`;
 
-      // Fetch dynamic decisions and tasks from DB as well
-      const recentDecisions = await this.getRecentDecisions(organizationId);
-      const pendingTasks = await this.getPendingTasks(organizationId);
+      // Fetch dynamic governance memory from DB as well
+      const [recentDecisions, pendingTasks, openRisks, openViolations, openFindings] = await Promise.all([
+        this.getRecentDecisions(organizationId),
+        this.getPendingTasks(organizationId),
+        this.getOpenRisks(organizationId),
+        this.getOpenViolations(organizationId),
+        this.getOpenExpertFindings(organizationId),
+      ]);
       
       payload += `\n=== القرارات المتخذة مؤخراً عبر النظام ===\n`;
       if (recentDecisions.length === 0) {
