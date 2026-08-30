@@ -1324,11 +1324,22 @@ async function startServer() {
       }
     };
 
-    const publishSpeakerResult = async (diagResult: any, isCalibration = false, phase: 'PROBE' | 'FINAL' = 'FINAL') => {
+    const publishSpeakerResult = async (diagResult: any, isCalibration = false, phase: 'PROBE' | 'FINAL' = 'FINAL', expectedSpeechEpoch = currentSpeechEpoch) => {
       if (!diagResult) return;
       const rawSimilarity = diagResult.similarity !== undefined ? diagResult.similarity : -1;
       const rawSpeaker = diagResult.name || 'UNKNOWN';
       const currentTurn = liveTurnSequence;
+      if (expectedSpeechEpoch !== currentSpeechEpoch) {
+        console.log('[SPEAKER_STALE_RESULT_IGNORED]', {
+          phase,
+          expectedSpeechEpoch,
+          currentSpeechEpoch,
+          rawSpeaker,
+          rawSimilarity,
+          segmentId: diagResult.debugInfo?.segmentId || '?',
+        });
+        return;
+      }
       
       let action = 'RETAINED';
       let reason = 'NO_CHANGE';
