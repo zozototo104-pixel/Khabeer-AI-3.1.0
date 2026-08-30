@@ -1417,6 +1417,7 @@ async function startServer() {
           debugInfo: {
             ...diagResult.debugInfo,
             turnId: currentTurn,
+            speechEpoch: expectedSpeechEpoch,
           },
         }));
       }
