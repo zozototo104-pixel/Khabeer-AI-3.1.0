@@ -61,11 +61,14 @@ async function migrate() {
   }
 }
 
-migrate()
-  .catch((error) => {
-    console.error('Database migration failed:', error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
+(async () => {
+  try {
+    await migrate();
     await pool.end().catch(() => {});
-  });
+    process.exit(0);
+  } catch (error) {
+    console.error('Database migration failed:', error);
+    await pool.end().catch(() => {});
+    process.exit(1);
+  }
+})();
