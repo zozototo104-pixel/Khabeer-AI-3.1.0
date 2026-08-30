@@ -1186,6 +1186,19 @@ async function startServer() {
       sendLiveContext(activeLiveSession, text);
     };
 
+    const dropStaleSpeakerLiveContext = (reason: string) => {
+      if (!pendingLiveContext) return;
+      const queuedReason = pendingLiveContext.reason || '';
+      if (/^(SPEAKER_HANDOFF|UNKNOWN_SPEAKER|MANUAL_SPEAKER_OVERRIDE|SPEECH_START_UNKNOWN_CONTEXT)/.test(queuedReason)) {
+        console.log('[LiveContext] Dropped stale speaker metadata at new speech boundary', {
+          reason,
+          queuedReason,
+          queuedMs: Date.now() - pendingLiveContext.queuedAt,
+        });
+        pendingLiveContext = null;
+      }
+    };
+
     const injectVerifiedSpeakerHandoffContext = (reason: string, phase: 'PROBE' | 'FINAL' | 'IDENTITY_QUESTION' = 'PROBE') => {
       if (!activeLiveSession) return;
       if (activeSpeakerAttribution.identitySource !== 'VERIFIED' || !activeSpeakerAttribution.speakerId || !activeSpeakerAttribution.speakerName || activeSpeakerAttribution.speakerName === 'متحدث غير معروف') return;
