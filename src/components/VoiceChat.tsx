@@ -1177,6 +1177,34 @@ const [lastSpeakerDiagnostic, setLastSpeakerDiagnostic] = useState<{
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
+  const primeOutputAudioContext = useCallback(async (audioCtx: AudioContext) => {
+    if (!audioCtx || audioCtx.state === 'closed') return;
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
+    }
+    // iOS/WebKit sometimes keeps the physical speaker route locked until a
+    // source node starts inside the same user gesture that opens the live call.
+    // Play a 1-frame silent buffer at zero gain to unlock output without
+    // changing audible behavior or the jitter buffer.
+    try {
+      const buffer = audioCtx.createBuffer(1, 1, Math.max(8000, Math.floor(audioCtx.sampleRate || 24000)));
+      const source = audioCtx.createBufferSource();
+      const gain = audioCtx.createGain();
+      gain.gain.value = 0;
+      source.buffer = buffer;
+      source.connect(gain);
+      gain.connect(audioCtx.destination);
+      source.start(0);
+      source.onended = () => {
+        try { source.disconnect(); } catch {}
+        try { gain.disconnect(); } catch {}
+      };
+      addDebugLog('[AUDIO_UNLOCK] Primed output AudioContext with silent frame');
+    } catch (error) {
+      addDebugLog(`[AUDIO_UNLOCK] Silent prime skipped: ${(error as Error)?.message || 'unknown'}`);
+    }
+  }, [addDebugLog]);
+
   const scheduleAudioPlayback = useCallback(() => {
     const audioCtx = outputAudioCtxRef.current;
     if (!audioCtx || audioCtx.state === 'closed') return;
