@@ -3781,6 +3781,7 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
 
       // 2. Fetch context from memory, permanent user profile, and knowledge base
       let dynamicContext = "";
+      let knowledgeContextForReliability = "";
       try {
         const ownedSessions = await getSessions(req.dbUser.id);
         const currentSession = ownedSessions.find((row) => row.id === sessionId);
@@ -3793,6 +3794,7 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
             memoryEngine.getContextualMemoryPayload(org.id),
             ragEngine.buildPromptContext(text, org.id, 24000),
           ]);
+          knowledgeContextForReliability = knowledgePayload;
           dynamicContext = `\n\n${userProfilePayload}\n\n=== ذاكرة المؤسسة (Contextual Memory) ===\n${memoryPayload}\n\n=== المعرفة المؤسسية (Knowledge Base) ===\n${knowledgePayload}`;
         } else {
           dynamicContext = `\n\n${userProfilePayload}`;
