@@ -4,6 +4,7 @@ import {
   buildAnswerReliabilityInstruction,
   buildAnswerReliabilityProfile,
   detectExpertAnswerDomain,
+  extractInternalCitationHints,
 } from '../server/services/expert/AnswerReliabilityPolicy.ts';
 
 test('detects legal and internal-review questions', () => {
@@ -22,13 +23,36 @@ test('requires explicit missing-source disclosure when internal evidence is abse
   assert.match(instruction, /درجة الثقة/);
 });
 
-test('requires internal/source separation and conflict handling when evidence exists', () => {
+test('extracts citation hints from RAG evidence blocks', () => {
+  const hints = extractInternalCitationHints(`
+📌 [دليل مسترجع من: لائحة الاختبار، الصفحة 12 | score=91]
+نص تنظيمي واضح
+---
+📜 [📌 نص رسمي للمادة (7) من لائحة العقوبات]
+نص المادة
+`);
+  assert.equal(hints.length, 2);
+  assert.deepEqual(hints[0], {
+    id: 'م1',
+    title: 'لائحة الاختبار',
+    page: '12',
+    score: '91',
+    kind: 'EVIDENCE',
+  });
+  assert.equal(hints[1].id, 'م2');
+  assert.equal(hints[1].kind, 'ARTICLE');
+  assert.match(hints[1].title, /لائحة العقوبات/);
+});
+
+test('requires internal/source separation, citation use, and conflict handling when evidence exists', () => {
   const instruction = buildAnswerReliabilityInstruction(
     'ما رأيك باللائحة الخاصة بنا من ناحية قانونية؟',
-    'دليل مسترجع من الوثيقة: لائحة الاختبار الصفحة 12 score=0.91 نص تنظيمي واضح'.repeat(8),
+    '📌 [دليل مسترجع من: لائحة الاختبار، الصفحة 12 | score=91]\nنص تنظيمي واضح'.repeat(8),
   );
   assert.match(instruction, /حسب ملفاتك الداخلية/);
   assert.match(instruction, /من الناحية العامة أو التخصصية/);
   assert.match(instruction, /التعارضات أو القيود/);
   assert.match(instruction, /الأولوية للملفات الداخلية/);
+  assert.match(instruction, /\[م1\] دليل مسترجع: لائحة الاختبار، الصفحة 12، score=91/);
+  assert.match(instruction, /وفق \[م1\]/);
 });
