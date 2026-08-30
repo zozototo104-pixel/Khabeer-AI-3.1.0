@@ -2549,6 +2549,8 @@ ${liveKnowledgeContext}`;
             console.log('[VoiceWS] Continuing existing speech segment after brief pause', { sid, turn: liveTurnSequence });
             return;
           }
+          currentSpeechEpoch += 1;
+          console.log('[VoiceWS] New speech epoch started', { sid, turn: liveTurnSequence, speechEpoch: currentSpeechEpoch });
           lastSpeakerTask = null;
           pendingSelfIdentifiedName = '';
           activeSpeakerAttribution = {
