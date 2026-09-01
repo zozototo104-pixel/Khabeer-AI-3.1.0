@@ -229,6 +229,10 @@ export default function Settings() {
         }),
       });
       if (!res.ok) throw new Error('فشل الحذف النهائي.');
+      if (selectedPurgeCategories.speakerProfiles) {
+        localStorage.removeItem('gemini_voice_footprints_v3');
+        localStorage.removeItem('khabeer_speaker_profiles');
+      }
       setPurgeResult('تم تنفيذ الحذف النهائي للبنود المحددة.');
       setSelectedPurgeCategories({});
       setPurgeConfirmText('');
