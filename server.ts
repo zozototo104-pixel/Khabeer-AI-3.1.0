@@ -5345,6 +5345,12 @@ console.log('✅ Tasks database schema is ready.');
       const { and, eq } = await import('drizzle-orm');
       const org = await resolveOwnedOrganization(req.user.uid, req.body.orgId);
       if (!org) return res.status(404).json({ error: 'Organization not found' });
+      const existingRows = await db.select().from(tasks).where(and(
+        eq(tasks.id, taskId),
+        eq(tasks.orgId, org.id),
+      )).limit(1);
+      const currentTask = existingRows[0];
+      if (!currentTask) return res.status(404).json({ error: 'Task not found' });
 
       const updateData: any = {};
       if (status !== undefined) updateData.status = status;
