@@ -1,5 +1,5 @@
 import { db } from './index.ts';
-import { sessions, messages, decisions, tasks, risks, meetingEvents, violations, expertFindings, consultationCalls, meetingInvites, institutionalMemoryEntries } from './schema.ts';
+import { sessions, messages, decisions, tasks, risks, meetingEvents, violations, expertFindings, consultationCalls, meetingInvites, institutionalMemoryEntries, users, organizations } from './schema.ts';
 import { asc, eq, desc } from 'drizzle-orm';
 
 export interface CreateSessionInput {
