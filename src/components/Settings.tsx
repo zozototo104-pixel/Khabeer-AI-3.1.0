@@ -448,6 +448,120 @@ export default function Settings() {
           </div>
         </section>
 
+        {/* Permanent memory deletion */}
+        <section className="bg-red-950/30 border border-red-700/60 rounded-2xl p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="font-black text-lg text-red-300 mb-2">
+                🛑 حذف نهائي من ذاكرة الخبير وقاعدة البيانات
+              </h2>
+              <p className="text-xs text-red-100/80 leading-6">
+                هذا الزر مختلف عن حذف جلسة واحدة. هنا تختار ما تريد مسحه نهائياً من ذاكرة الخبير،
+                بما في ذلك الذاكرة الطويلة الأمد، الجلسات، الملفات، والبصمات.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={toggleDangerZone}
+              className="bg-red-700 hover:bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-black shrink-0"
+            >
+              {showDangerZone ? 'إخفاء' : 'فتح الحذف الأحمر'}
+            </button>
+          </div>
+
+          {showDangerZone && (
+            <div className="mt-5 space-y-4">
+              <div className="flex items-center justify-between gap-3 bg-slate-950/70 border border-red-900/60 rounded-xl p-3">
+                <div className="text-xs text-slate-300 leading-6">
+                  يعرض هذا القسم ملخص ما هو محفوظ حالياً. اختر البنود، ثم اكتب عبارة التأكيد.
+                </div>
+                <button
+                  type="button"
+                  onClick={loadMemoryInventory}
+                  disabled={isLoadingInventory}
+                  className="bg-slate-800 hover:bg-slate-700 disabled:opacity-60 rounded-lg px-3 py-2 text-xs font-bold"
+                >
+                  {isLoadingInventory ? 'جار الفحص...' : 'تحديث الفحص'}
+                </button>
+              </div>
+
+              {memoryInventory?.organization && (
+                <div className="text-xs text-slate-300 bg-slate-950/50 rounded-xl p-3 border border-slate-800">
+                  المؤسسة الحالية: <strong>{memoryInventory.organization.name}</strong>
+                </div>
+              )}
+
+              <div className="grid gap-3">
+                {PURGE_CATEGORIES.map((category) => {
+                  const inventoryCategory = memoryInventory?.categories?.[category.key];
+                  const count = inventoryCategory?.count;
+                  const sample = Array.isArray(inventoryCategory?.sample) ? inventoryCategory.sample.slice(0, 3) : [];
+                  const selected = !!selectedPurgeCategories[category.key];
+                  return (
+                    <label
+                      key={category.key}
+                      className={`block rounded-xl border p-3 cursor-pointer transition-all ${
+                        selected
+                          ? 'bg-red-900/50 border-red-400'
+                          : 'bg-slate-950 border-slate-800 hover:border-red-800'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={() => togglePurgeCategory(category.key)}
+                          className="mt-1 accent-red-600"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-sm text-white">{category.label}</span>
+                            <span className="text-[11px] text-red-200 bg-red-950/70 border border-red-800 rounded-full px-2 py-0.5">
+                              العدد: {count ?? 'غير مفحوص'}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 mt-1 leading-5">{category.danger}</p>
+                          {sample.length > 0 && (
+                            <div className="mt-2 text-[11px] text-slate-500 space-y-1">
+                              {sample.map((item: any, index: number) => (
+                                <div key={`${category.key}-${index}`} className="truncate">
+                                  • {item.title || item.name || item.fileName || item.speakerId || `عنصر #${item.id || index + 1}`}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="bg-red-950/50 border border-red-800 rounded-xl p-3">
+                <label className="block text-sm font-bold text-red-200 mb-2">
+                  اكتب عبارة التأكيد: حذف نهائي
+                </label>
+                <input
+                  value={purgeConfirmText}
+                  onChange={(e) => setPurgeConfirmText(e.target.value)}
+                  placeholder="حذف نهائي"
+                  className="w-full bg-slate-950 border border-red-800 rounded-xl p-3 outline-none focus:border-red-400"
+                />
+                <button
+                  type="button"
+                  onClick={runPermanentPurge}
+                  disabled={isPurging || selectedPurgeCount === 0 || purgeConfirmText.trim() !== 'حذف نهائي'}
+                  className="mt-3 w-full bg-red-700 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl p-3 font-black text-white"
+                >
+                  {isPurging ? 'جار الحذف النهائي...' : `تنفيذ حذف نهائي للبنود المحددة (${selectedPurgeCount})`}
+                </button>
+                {purgeError && <p className="mt-3 text-sm text-red-300 font-bold">{purgeError}</p>}
+                {purgeResult && <p className="mt-3 text-sm text-emerald-300 font-bold">{purgeResult}</p>}
+              </div>
+            </div>
+          )}
+        </section>
+
         {/* Save */}
         <div className="flex gap-3 pb-8">
           <button
