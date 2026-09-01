@@ -5367,7 +5367,30 @@ console.log('✅ Tasks database schema is ready.');
         eq(tasks.orgId, org.id),
       )).returning();
       if (!updated.length) return res.status(404).json({ error: 'Task not found' });
-      res.json({ success: true, task: updated[0] });
+      const updatedTask = updated[0];
+      if (String(updatedTask.status || '').toUpperCase() === 'COMPLETED') {
+        await db.insert(institutionalMemoryEntries).values({
+          orgId: org.id,
+          sourceSessionId: updatedTask.sessionId || currentTask.sessionId || null,
+          sourceEntityType: 'task_update',
+          sourceEntityId: String(taskId),
+          memoryType: 'task_history',
+          title: `مهمة منجزة: ${updatedTask.title}`,
+          content: [
+            `المهمة: ${updatedTask.title}`,
+            `المكلف: ${updatedTask.assignee || 'غير محدد'}`,
+            `الحالة السابقة: ${currentTask.status || 'غير محددة'}`,
+            `الحالة الجديدة: COMPLETED`,
+            `الوصف/الإجراء: ${updatedTask.description || currentTask.description || 'غير محدد'}`,
+            `الناتج: ${updatedTask.deliverable || 'غير محدد'}`,
+          ].join('. '),
+          subject: updatedTask.assignee || updatedTask.title,
+          importance: 5,
+          status: 'ACTIVE',
+          metadata: { updatedByUid: req.user.uid, previousStatus: currentTask.status, status: updatedTask.status },
+        });
+      }
+      res.json({ success: true, task: updatedTask });
     } catch (e) {
       console.error('Error updating task:', e);
       res.status(500).json({ error: 'Failed to update task' });
