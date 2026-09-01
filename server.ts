@@ -3991,6 +3991,11 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
         if (selected.sessions && sessionIds.length) {
           await tx.delete(dbMeetingInvites).where(inArray(dbMeetingInvites.sessionId, sessionIds));
           await tx.delete(dbConsultationCalls).where(inArray(dbConsultationCalls.sessionId, sessionIds));
+          await tx.delete(dbExpertFindings).where(inArray(dbExpertFindings.sessionId, sessionIds));
+          await tx.delete(dbViolations).where(inArray(dbViolations.sessionId, sessionIds));
+          await tx.delete(dbRisks).where(inArray(dbRisks.meetingId, sessionIds));
+          await tx.delete(dbDecisions).where(inArray(dbDecisions.sessionId, sessionIds));
+          await tx.delete(dbTasks).where(inArray(dbTasks.sessionId, sessionIds));
           await tx.delete(dbMeetingEvents).where(inArray(dbMeetingEvents.sessionId, sessionIds));
           await tx.delete(dbMessages).where(inArray(dbMessages.sessionId, sessionIds));
           await tx.delete(dbSessions).where(inArray(dbSessions.id, sessionIds));
