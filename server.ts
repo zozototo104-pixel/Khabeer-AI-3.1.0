@@ -3859,6 +3859,58 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
     }
   });
 
+  app.get('/api/sessions/:id/delete-impact', requireAuth, async (req: any, res) => {
+    try {
+      const sessionId = Number(req.params.id);
+      if (!Number.isFinite(sessionId)) return res.status(400).json({ error: 'Invalid session ID' });
+      const ownedSessions = await getSessions(req.dbUser.id);
+      const session = ownedSessions.find((item) => Number(item.id) === sessionId);
+      if (!session) return res.status(404).json({ error: 'Session not found' });
+
+      const [messageRows, decisionRows, taskRows, riskRows, violationRows, findingRows, eventRows, inviteRows, callRows] = await Promise.all([
+        db.select({ id: dbMessages.id }).from(dbMessages).where(eq(dbMessages.sessionId, sessionId)),
+        db.select({ id: dbDecisions.id, status: dbDecisions.status }).from(dbDecisions).where(eq(dbDecisions.sessionId, sessionId)),
+        db.select({ id: dbTasks.id, status: dbTasks.status }).from(dbTasks).where(eq(dbTasks.sessionId, sessionId)),
+        db.select({ id: dbRisks.id, status: dbRisks.status }).from(dbRisks).where(eq(dbRisks.meetingId, sessionId)),
+        db.select({ id: dbViolations.id, status: dbViolations.status }).from(dbViolations).where(eq(dbViolations.sessionId, sessionId)),
+        db.select({ id: dbExpertFindings.id, status: dbExpertFindings.status }).from(dbExpertFindings).where(eq(dbExpertFindings.sessionId, sessionId)),
+        db.select({ id: dbMeetingEvents.id }).from(dbMeetingEvents).where(eq(dbMeetingEvents.sessionId, sessionId)),
+        db.select({ id: dbMeetingInvites.id }).from(dbMeetingInvites).where(eq(dbMeetingInvites.sessionId, sessionId)),
+        db.select({ id: dbConsultationCalls.id }).from(dbConsultationCalls).where(eq(dbConsultationCalls.sessionId, sessionId)),
+      ]);
+
+      res.json({
+        sessionId,
+        title: session.title,
+        willDelete: {
+          messages: messageRows.length,
+          meetingEvents: eventRows.length,
+          decisions: decisionRows.filter((item) => String(item.status || '').toUpperCase() !== 'RECOMMENDED').length,
+          recommendations: decisionRows.filter((item) => String(item.status || '').toUpperCase() === 'RECOMMENDED').length,
+          tasks: taskRows.length,
+          risks: riskRows.length,
+          violations: violationRows.length,
+          expertFindings: findingRows.length,
+          invites: inviteRows.length,
+          consultationCalls: callRows.length,
+          participants: Array.isArray(session.participants) ? session.participants.length : 0,
+          minutes: session.minutes ? 1 : 0,
+          agenda: session.agenda ? 1 : 0,
+        },
+        willPreserveAsDurableMemory: {
+          completedTasks: taskRows.filter((item) => String(item.status || '').toUpperCase() === 'COMPLETED').length,
+          decisionsAndRecommendations: decisionRows.length,
+          closedRisks: riskRows.filter((item) => ['CLOSED', 'RESOLVED', 'ACCEPTED'].includes(String(item.status || '').toUpperCase())).length,
+          closedViolations: violationRows.filter((item) => ['CLOSED', 'RESOLVED', 'DISMISSED'].includes(String(item.status || '').toUpperCase())).length,
+          importantFacts: 'سيتم حفظ الحقائق المهمة المستخرجة آلياً مثل الأشخاص والأدوار والأسعار المهمة عند اكتشافها.',
+        },
+      });
+    } catch (e) {
+      console.error('Error building delete impact:', e);
+      res.status(500).json({ error: 'Failed to build delete impact' });
+    }
+  });
+
   app.delete('/api/sessions/:id', requireAuth, async (req: any, res) => {
     try {
       const sessionId = parseInt(req.params.id);
@@ -3868,10 +3920,121 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
       const ownedSessions = await getSessions(req.dbUser.id);
       if (!ownedSessions.some((session) => session.id === sessionId)) return res.status(404).json({ error: 'Session not found' });
       await deleteSession(sessionId);
-      res.json({ success: true, sessionId });
+      res.json({ success: true, sessionId, durableMemoryPreserved: true });
     } catch (e) {
       console.error('Error deleting session:', e);
       res.status(500).json({ error: 'Failed to delete session' });
+    }
+  });
+
+  app.get('/api/privacy/memory-inventory', requireAuth, async (req: any, res) => {
+    try {
+      const org = await memoryEngine.getOrganizationByOwner(req.user.uid);
+      const orgId = org?.id ? Number(org.id) : 0;
+      const userSessionRows = await db.select().from(dbSessions).where(eq(dbSessions.userId, req.dbUser.id));
+      const sessionIds = userSessionRows.map((item: any) => Number(item.id)).filter((id: number) => Number.isFinite(id));
+      const knowledgeRows = orgId ? await db.select({ id: dbKnowledge.id, title: dbKnowledge.title }).from(dbKnowledge).where(eq(dbKnowledge.orgId, orgId)) : [];
+      const knowledgeIds = knowledgeRows.map((item: any) => Number(item.id)).filter((id: number) => Number.isFinite(id));
+
+      const [memoryRows, speakerRows, messageRows, decisionRows, taskRows, riskRows, violationRows, findingRows, eventRows, fileRows] = await Promise.all([
+        orgId ? db.select({ id: dbInstitutionalMemoryEntries.id, title: dbInstitutionalMemoryEntries.title, memoryType: dbInstitutionalMemoryEntries.memoryType }).from(dbInstitutionalMemoryEntries).where(eq(dbInstitutionalMemoryEntries.orgId, orgId)) : Promise.resolve([]),
+        db.select({ id: dbSpeakerProfiles.id, name: dbSpeakerProfiles.name, speakerId: dbSpeakerProfiles.speakerId, status: dbSpeakerProfiles.status }).from(dbSpeakerProfiles).where(eq(dbSpeakerProfiles.ownerId, req.user.uid)),
+        sessionIds.length ? db.select({ id: dbMessages.id }).from(dbMessages).where(inArray(dbMessages.sessionId, sessionIds)) : Promise.resolve([]),
+        orgId ? db.select({ id: dbDecisions.id, title: dbDecisions.title, status: dbDecisions.status }).from(dbDecisions).where(eq(dbDecisions.orgId, orgId)) : Promise.resolve([]),
+        orgId ? db.select({ id: dbTasks.id, title: dbTasks.title, assignee: dbTasks.assignee, status: dbTasks.status }).from(dbTasks).where(eq(dbTasks.orgId, orgId)) : Promise.resolve([]),
+        orgId ? db.select({ id: dbRisks.id, title: dbRisks.title, status: dbRisks.status }).from(dbRisks).where(eq(dbRisks.orgId, orgId)) : Promise.resolve([]),
+        orgId ? db.select({ id: dbViolations.id, title: dbViolations.title, status: dbViolations.status }).from(dbViolations).where(eq(dbViolations.orgId, orgId)) : Promise.resolve([]),
+        orgId ? db.select({ id: dbExpertFindings.id, title: dbExpertFindings.title, status: dbExpertFindings.status }).from(dbExpertFindings).where(eq(dbExpertFindings.orgId, orgId)) : Promise.resolve([]),
+        sessionIds.length ? db.select({ id: dbMeetingEvents.id }).from(dbMeetingEvents).where(inArray(dbMeetingEvents.sessionId, sessionIds)) : Promise.resolve([]),
+        knowledgeIds.length ? db.select({ id: dbKnowledgeFiles.id, fileName: dbKnowledgeFiles.fileName }).from(dbKnowledgeFiles).where(inArray(dbKnowledgeFiles.knowledgeId, knowledgeIds)) : Promise.resolve([]),
+      ]);
+
+      res.json({
+        organization: org ? { id: org.id, name: org.name || 'مؤسستي' } : null,
+        categories: {
+          sessions: { count: userSessionRows.length, sample: userSessionRows.slice(0, 8).map((item: any) => ({ id: item.id, title: item.title, status: item.status })) },
+          messages: { count: messageRows.length },
+          meetingEvents: { count: eventRows.length },
+          decisionsAndRecommendations: { count: decisionRows.length, sample: decisionRows.slice(0, 8) },
+          tasks: { count: taskRows.length, sample: taskRows.slice(0, 8) },
+          risks: { count: riskRows.length, sample: riskRows.slice(0, 8) },
+          violations: { count: violationRows.length, sample: violationRows.slice(0, 8) },
+          expertFindings: { count: findingRows.length, sample: findingRows.slice(0, 8) },
+          durableMemory: { count: memoryRows.length, sample: memoryRows.slice(0, 12) },
+          knowledge: { count: knowledgeRows.length, sample: knowledgeRows.slice(0, 8) },
+          knowledgeFiles: { count: fileRows.length, sample: fileRows.slice(0, 8) },
+          speakerProfiles: { count: speakerRows.length, sample: speakerRows.slice(0, 8) },
+        },
+      });
+    } catch (e) {
+      console.error('Error loading memory inventory:', e);
+      res.status(500).json({ error: 'Failed to load memory inventory' });
+    }
+  });
+
+  app.post('/api/privacy/purge', requireAuth, async (req: any, res) => {
+    try {
+      const selected = req.body?.categories || {};
+      const confirmText = String(req.body?.confirmText || '').trim();
+      if (confirmText !== 'حذف نهائي') {
+        return res.status(400).json({ error: 'CONFIRM_TEXT_REQUIRED' });
+      }
+      const org = await memoryEngine.getOrganizationByOwner(req.user.uid);
+      const orgId = org?.id ? Number(org.id) : 0;
+      const userSessionRows = await db.select({ id: dbSessions.id }).from(dbSessions).where(eq(dbSessions.userId, req.dbUser.id));
+      const sessionIds = userSessionRows.map((item: any) => Number(item.id)).filter((id: number) => Number.isFinite(id));
+      const knowledgeRows = orgId ? await db.select({ id: dbKnowledge.id }).from(dbKnowledge).where(eq(dbKnowledge.orgId, orgId)) : [];
+      const knowledgeIds = knowledgeRows.map((item: any) => Number(item.id)).filter((id: number) => Number.isFinite(id));
+
+      const deleted: Record<string, number | boolean> = {};
+      await db.transaction(async (tx) => {
+        if (selected.sessions && sessionIds.length) {
+          await tx.delete(dbMeetingInvites).where(inArray(dbMeetingInvites.sessionId, sessionIds));
+          await tx.delete(dbConsultationCalls).where(inArray(dbConsultationCalls.sessionId, sessionIds));
+          await tx.delete(dbMeetingEvents).where(inArray(dbMeetingEvents.sessionId, sessionIds));
+          await tx.delete(dbMessages).where(inArray(dbMessages.sessionId, sessionIds));
+          await tx.delete(dbSessions).where(inArray(dbSessions.id, sessionIds));
+          deleted.sessions = sessionIds.length;
+        }
+        if (selected.decisionsAndRecommendations && orgId) {
+          await tx.delete(dbDecisions).where(eq(dbDecisions.orgId, orgId));
+          deleted.decisionsAndRecommendations = true;
+        }
+        if (selected.tasks && orgId) {
+          await tx.delete(dbTasks).where(eq(dbTasks.orgId, orgId));
+          deleted.tasks = true;
+        }
+        if (selected.risks && orgId) {
+          await tx.delete(dbRisks).where(eq(dbRisks.orgId, orgId));
+          deleted.risks = true;
+        }
+        if (selected.violations && orgId) {
+          await tx.delete(dbViolations).where(eq(dbViolations.orgId, orgId));
+          deleted.violations = true;
+        }
+        if (selected.expertFindings && orgId) {
+          await tx.delete(dbExpertFindings).where(eq(dbExpertFindings.orgId, orgId));
+          deleted.expertFindings = true;
+        }
+        if (selected.durableMemory && orgId) {
+          await tx.delete(dbInstitutionalMemoryEntries).where(eq(dbInstitutionalMemoryEntries.orgId, orgId));
+          deleted.durableMemory = true;
+        }
+        if (selected.knowledge && orgId) {
+          if (knowledgeIds.length) await tx.delete(dbKnowledgeFiles).where(inArray(dbKnowledgeFiles.knowledgeId, knowledgeIds));
+          await tx.delete(dbKnowledge).where(eq(dbKnowledge.orgId, orgId));
+          deleted.knowledge = true;
+        }
+        if (selected.speakerProfiles) {
+          await tx.delete(dbSpeakerProfiles).where(eq(dbSpeakerProfiles.ownerId, req.user.uid));
+          deleted.speakerProfiles = true;
+        }
+      });
+
+      res.json({ success: true, deleted });
+    } catch (e) {
+      console.error('Error purging memory:', e);
+      res.status(500).json({ error: 'Failed to purge memory' });
     }
   });
 
