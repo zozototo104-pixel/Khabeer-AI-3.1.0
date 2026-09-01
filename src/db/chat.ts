@@ -222,7 +222,20 @@ function extractDurableFactsFromMessages(rows: any[], limit = 20): Array<{ title
 
 async function archiveDurableSessionMemory(tx: any, sessionId: number) {
   const [session] = await tx.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1);
-  if (!session?.orgId) return;
+  if (!session) return;
+
+  let archiveOrgId = Number(session.orgId || 0);
+  if (!archiveOrgId && session.userId) {
+    const [owner] = await tx.select({ uid: users.uid }).from(users).where(eq(users.id, session.userId)).limit(1);
+    if (owner?.uid) {
+      const [org] = await tx.select({ id: organizations.id }).from(organizations)
+        .where(eq(organizations.ownerId, owner.uid))
+        .orderBy(desc(organizations.updatedAt))
+        .limit(1);
+      archiveOrgId = Number(org?.id || 0);
+    }
+  }
+  if (!archiveOrgId) return;
 
   const [messageRows, decisionRows, taskRows, riskRows, violationRows, findingRows, eventRows] = await Promise.all([
     tx.select().from(messages).where(eq(messages.sessionId, sessionId)),
