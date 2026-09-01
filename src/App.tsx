@@ -513,7 +513,7 @@ const [currentTab, setCurrentTab] = useState<'chat' | 'dashboard' | 'knowledge' 
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSessionToDelete({ id: s.id, title: s.title || `جلسة رقم #${s.id}` });
+                    requestDeleteSession({ id: s.id, title: s.title || `جلسة رقم #${s.id}` });
                   }}
                   className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 cursor-pointer"
                   title="حذف المحادثة"
