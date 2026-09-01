@@ -161,7 +161,9 @@ export async function deleteSession(sessionId: number) {
   if (!sId || Number.isNaN(sId)) return;
   try {
     await db.transaction(async (tx) => {
-      // Meeting invite tokens must be removed in the same transaction as the session.
+      // Full hard purge for session-scoped memory. Nothing produced inside this
+      // session should remain available to chat history, minutes, timeline, or
+      // institutional memory after deletion.
       await tx.delete(meetingInvites).where(eq(meetingInvites.sessionId, sId));
       await tx.delete(expertFindings).where(eq(expertFindings.sessionId, sId));
       await tx.delete(violations).where(eq(violations.sessionId, sId));
@@ -171,6 +173,17 @@ export async function deleteSession(sessionId: number) {
       await tx.delete(decisions).where(eq(decisions.sessionId, sId));
       await tx.delete(tasks).where(eq(tasks.sessionId, sId));
       await tx.delete(risks).where(eq(risks.meetingId, sId));
+      // Clear large narrative fields before deleting the row. This is redundant
+      // for hard delete, but protects against future DB adapters that may switch
+      // to soft-delete semantics.
+      await tx.update(sessions).set({
+        summary: null,
+        minutes: null,
+        agenda: null,
+        participants: [],
+        deletedAt: new Date(),
+        updatedAt: new Date(),
+      }).where(eq(sessions.id, sId));
       await tx.delete(sessions).where(eq(sessions.id, sId));
     });
   } catch (e) {
