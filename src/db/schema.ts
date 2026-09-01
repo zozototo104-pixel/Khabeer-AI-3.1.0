@@ -172,6 +172,24 @@ export const knowledgeFiles = pgTable('knowledge_files', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+export const institutionalMemoryEntries = pgTable('institutional_memory_entries', {
+  id: serial('id').primaryKey(),
+  orgId: integer('org_id').references(() => organizations.id).notNull(),
+  sourceSessionId: integer('source_session_id'),
+  sourceEntityType: text('source_entity_type').default('manual'),
+  sourceEntityId: text('source_entity_id'),
+  memoryType: text('memory_type').notNull().default('fact'),
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  subject: text('subject'),
+  importance: integer('importance').default(3),
+  status: text('status').default('ACTIVE'),
+  metadata: jsonb('metadata').default({}),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+  deletedAt: timestamp('deleted_at'),
+});
+
 export const meetingEvents = pgTable('meeting_events', {
   id: serial('id').primaryKey(),
   orgId: integer('org_id').references(() => organizations.id),
