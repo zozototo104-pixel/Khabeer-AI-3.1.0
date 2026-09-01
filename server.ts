@@ -5157,7 +5157,7 @@ console.log('✅ Tasks database schema is ready.');
       const allowedStatuses = ['UNDER_REVIEW', 'CONFIRMED', 'DISMISSED', 'REMEDIATED'];
       if (!allowedStatuses.includes(requestedStatus)) return res.status(400).json({ error: 'INVALID_VIOLATION_STATUS' });
       const { db } = await import('./src/db/index.ts');
-      const { violations } = await import('./src/db/schema.ts');
+      const { violations, institutionalMemoryEntries } = await import('./src/db/schema.ts');
       const { and, eq } = await import('drizzle-orm');
       const rows = await db.select().from(violations).where(and(eq(violations.id, violationId), eq(violations.orgId, org.id))).limit(1);
       const current = rows[0];
