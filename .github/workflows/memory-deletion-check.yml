@@ -1,0 +1,61 @@
+name: Memory Deletion Fast Check
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/db/chat.ts'
+      - 'src/db/schema.ts'
+      - 'server.ts'
+      - 'server/services/memory/MemoryEngine.ts'
+      - 'src/App.tsx'
+      - 'src/components/Settings.tsx'
+      - 'tests/institutional_memory_deletion_policy.unit.test.ts'
+      - 'migrations/009_institutional_memory_entries.sql'
+      - '.github/workflows/memory-deletion-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: memory-deletion-fast-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  memory-deletion-fast-check:
+    name: TypeScript, tests, and build for memory deletion changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Inspect runner
+        run: |
+          echo "PWD=$(pwd)"
+          git status --short --branch
+          node --version
+          npm --version
+          echo "--- package scripts ---"
+          node -e "const p=require('./package.json'); console.log(JSON.stringify(p.scripts || {}, null, 2));"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Type-check project
+        run: npm run lint
+
+      - name: Run unit tests including memory deletion policy
+        run: npm run test:unit
+
+      - name: Build application
+        run: npm run build
