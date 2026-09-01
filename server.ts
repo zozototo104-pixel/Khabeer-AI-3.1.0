@@ -116,6 +116,24 @@ import {
 } from './server/services/knowledge/KnowledgeIngestionPipeline.ts';
 // P2/P1-2/P1-10 fixes: shared audit / rate-limit / token-revocation services
 import { recordAudit, checkRateLimit, revokeToken, isTokenRevoked } from './server/services/security/AuditService.ts';
+import { db } from './src/db/index.ts';
+import {
+  sessions as dbSessions,
+  messages as dbMessages,
+  decisions as dbDecisions,
+  tasks as dbTasks,
+  risks as dbRisks,
+  violations as dbViolations,
+  expertFindings as dbExpertFindings,
+  meetingEvents as dbMeetingEvents,
+  meetingInvites as dbMeetingInvites,
+  consultationCalls as dbConsultationCalls,
+  knowledge as dbKnowledge,
+  knowledgeFiles as dbKnowledgeFiles,
+  speakerProfiles as dbSpeakerProfiles,
+  institutionalMemoryEntries as dbInstitutionalMemoryEntries,
+} from './src/db/schema.ts';
+import { and, eq, inArray } from 'drizzle-orm';
 
 dotenv.config();
 
