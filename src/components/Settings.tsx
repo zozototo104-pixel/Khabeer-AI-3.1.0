@@ -165,6 +165,81 @@ export default function Settings() {
     setSaved(false);
   };
 
+  const loadMemoryInventory = async () => {
+    setIsLoadingInventory(true);
+    setPurgeError(null);
+    try {
+      const token = await getAuthToken();
+      if (!token) throw new Error('لا يوجد رمز دخول صالح.');
+      const res = await fetch('/api/privacy/memory-inventory', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('تعذر جلب محتويات ذاكرة الخبير.');
+      setMemoryInventory(await res.json());
+    } catch (error) {
+      setPurgeError((error as Error)?.message || 'حدث خطأ أثناء جلب الذاكرة.');
+    } finally {
+      setIsLoadingInventory(false);
+    }
+  };
+
+  const toggleDangerZone = async () => {
+    const next = !showDangerZone;
+    setShowDangerZone(next);
+    if (next && !memoryInventory) {
+      await loadMemoryInventory();
+    }
+  };
+
+  const togglePurgeCategory = (key: string) => {
+    setSelectedPurgeCategories(prev => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+    setPurgeResult(null);
+    setPurgeError(null);
+  };
+
+  const selectedPurgeCount = Object.values(selectedPurgeCategories).filter(Boolean).length;
+
+  const runPermanentPurge = async () => {
+    setPurgeResult(null);
+    setPurgeError(null);
+    if (selectedPurgeCount === 0) {
+      setPurgeError('اختر بنداً واحداً على الأقل للحذف النهائي.');
+      return;
+    }
+    if (purgeConfirmText.trim() !== 'حذف نهائي') {
+      setPurgeError('اكتب عبارة "حذف نهائي" لتأكيد العملية.');
+      return;
+    }
+    setIsPurging(true);
+    try {
+      const token = await getAuthToken(true);
+      if (!token) throw new Error('لا يوجد رمز دخول صالح.');
+      const res = await fetch('/api/privacy/purge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          categories: selectedPurgeCategories,
+          confirmText: purgeConfirmText.trim(),
+        }),
+      });
+      if (!res.ok) throw new Error('فشل الحذف النهائي.');
+      setPurgeResult('تم تنفيذ الحذف النهائي للبنود المحددة.');
+      setSelectedPurgeCategories({});
+      setPurgeConfirmText('');
+      await loadMemoryInventory();
+    } catch (error) {
+      setPurgeError((error as Error)?.message || 'حدث خطأ أثناء الحذف النهائي.');
+    } finally {
+      setIsPurging(false);
+    }
+  };
+
   return (
     <div
       dir="rtl"
