@@ -6,6 +6,30 @@ import { getUserByUid } from '../../../src/db/users.ts';
 export class MemoryEngine {
   constructor() {}
 
+  private keepOnlyActiveSessionScopedRows<T extends { sessionId?: number | null; meetingId?: number | null }>(rows: T[], activeSessionIds: Set<number>): T[] {
+    return rows.filter((row) => {
+      const scopedSessionId = Number(row.sessionId ?? row.meetingId ?? 0);
+      // Organization-level memory not attached to a session remains institutional.
+      if (!scopedSessionId) return true;
+      return activeSessionIds.has(scopedSessionId);
+    });
+  }
+
+  async getActiveSessionIdSet(organizationId: number): Promise<Set<number>> {
+    const rows = await db.select({
+      id: sessions.id,
+      status: sessions.status,
+      deletedAt: sessions.deletedAt,
+    })
+      .from(sessions)
+      .where(eq(sessions.orgId, organizationId));
+
+    return new Set(rows
+      .filter((row) => !row.deletedAt && String(row.status || '').toUpperCase() !== 'DELETED')
+      .map((row) => Number(row.id))
+      .filter((id) => Number.isFinite(id) && id > 0));
+  }
+
   async getUserProfile(uid: string): Promise<any> {
     try {
       return await getUserByUid(uid);
