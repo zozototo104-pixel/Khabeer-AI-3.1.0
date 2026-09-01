@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { getAuthToken } from '../lib/firebase';
 
 export interface AssistantSettings {
   userName: string;
