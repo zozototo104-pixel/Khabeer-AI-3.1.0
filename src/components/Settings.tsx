@@ -108,6 +108,14 @@ export default function Settings() {
     useState<AssistantSettings>(DEFAULT_SETTINGS);
 
   const [saved, setSaved] = useState(false);
+  const [showDangerZone, setShowDangerZone] = useState(false);
+  const [memoryInventory, setMemoryInventory] = useState<any | null>(null);
+  const [selectedPurgeCategories, setSelectedPurgeCategories] = useState<Record<string, boolean>>({});
+  const [purgeConfirmText, setPurgeConfirmText] = useState('');
+  const [isLoadingInventory, setIsLoadingInventory] = useState(false);
+  const [isPurging, setIsPurging] = useState(false);
+  const [purgeResult, setPurgeResult] = useState<string | null>(null);
+  const [purgeError, setPurgeError] = useState<string | null>(null);
 
   useEffect(() => {
     setSettings(loadAssistantSettings());
