@@ -156,6 +156,180 @@ export async function appendMeetingEvent(params: {
   return inserted[0];
 }
 
+function compactMemoryText(value: unknown, limit = 1200): string {
+  return String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, limit);
+}
+
+function extractDurableFactsFromMessages(rows: any[], limit = 20): Array<{ title: string; content: string; subject?: string; memoryType: string; importance: number; metadata?: Record<string, unknown> }> {
+  const output: Array<{ title: string; content: string; subject?: string; memoryType: string; importance: number; metadata?: Record<string, unknown> }> = [];
+  const seen = new Set<string>();
+  const add = (item: { title: string; content: string; subject?: string; memoryType: string; importance: number; metadata?: Record<string, unknown> }) => {
+    const key = `${item.memoryType}|${item.title}|${item.content}`.toLowerCase();
+    if (!item.title || !item.content || seen.has(key)) return;
+    seen.add(key);
+    output.push(item);
+  };
+
+  for (const row of rows) {
+    const text = compactMemoryText(row?.text, 900);
+    if (!text) continue;
+
+    const roleMatch = text.match(/([\u0600-\u06FFA-Za-z][\u0600-\u06FFA-Za-z\s]{1,40})\s+(?:هو|هي|اسمه|اسمها)?\s*(?:مدير|رئيس|مسؤول|مسؤولة|مالك|صاحب|موظف|عضو|مشرف|مستشار|محاسب|مهندس)\s+([^،.؟!\n]{2,80})/iu);
+    if (roleMatch) {
+      const person = compactMemoryText(roleMatch[1], 80);
+      add({
+        title: `شخص/دور معروف: ${person}`,
+        content: text,
+        subject: person,
+        memoryType: 'person_profile',
+        importance: 5,
+        metadata: { source: 'session_message', speakerName: row?.speakerName || null },
+      });
+    }
+
+    const priceMatch = text.match(/(?:اشتريت|اشترينا|سعر|بكم|تكلفة|كلف)\s+([^،.؟!\n]{2,80})\s+(?:من|في|عند)\s+([^،.؟!\n]{2,80})\s+(?:ب|بسعر|وكان\s+سعره)\s*([0-9٠-٩,.]+)\s*([^،.؟!\n]*)/iu);
+    if (priceMatch) {
+      const item = compactMemoryText(priceMatch[1], 80);
+      const place = compactMemoryText(priceMatch[2], 80);
+      add({
+        title: `معلومة سعر: ${item} لدى ${place}`,
+        content: text,
+        subject: `${item} - ${place}`,
+        memoryType: 'price_fact',
+        importance: 4,
+        metadata: { source: 'session_message', speakerName: row?.speakerName || null },
+      });
+    }
+
+    if (/(مهم|تذكر|لا تنسى|لازم تعرف|معلومة مهمة|للتاريخ)/iu.test(text)) {
+      add({
+        title: text.length > 90 ? `${text.slice(0, 87)}...` : text,
+        content: text,
+        subject: row?.speakerName || null,
+        memoryType: 'important_fact',
+        importance: 4,
+        metadata: { source: 'session_message', speakerName: row?.speakerName || null },
+      });
+    }
+
+    if (output.length >= limit) break;
+  }
+  return output.slice(0, limit);
+}
+
+async function archiveDurableSessionMemory(tx: any, sessionId: number) {
+  const [session] = await tx.select().from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  if (!session?.orgId) return;
+
+  const [messageRows, decisionRows, taskRows, riskRows, violationRows, findingRows, eventRows] = await Promise.all([
+    tx.select().from(messages).where(eq(messages.sessionId, sessionId)),
+    tx.select().from(decisions).where(eq(decisions.sessionId, sessionId)),
+    tx.select().from(tasks).where(eq(tasks.sessionId, sessionId)),
+    tx.select().from(risks).where(eq(risks.meetingId, sessionId)),
+    tx.select().from(violations).where(eq(violations.sessionId, sessionId)),
+    tx.select().from(expertFindings).where(eq(expertFindings.sessionId, sessionId)),
+    tx.select().from(meetingEvents).where(eq(meetingEvents.sessionId, sessionId)),
+  ]);
+
+  const values: any[] = [];
+  const pushMemory = (entry: any) => {
+    if (!entry?.title || !entry?.content) return;
+    values.push({
+      orgId: session.orgId,
+      sourceSessionId: sessionId,
+      sourceEntityType: entry.sourceEntityType || 'session_archive',
+      sourceEntityId: entry.sourceEntityId ? String(entry.sourceEntityId) : null,
+      memoryType: entry.memoryType || 'fact',
+      title: compactMemoryText(entry.title, 280),
+      content: compactMemoryText(entry.content, 1400),
+      subject: entry.subject ? compactMemoryText(entry.subject, 160) : null,
+      importance: entry.importance ?? 3,
+      status: 'ACTIVE',
+      metadata: {
+        ...(entry.metadata || {}),
+        archivedBecauseSessionDeleted: true,
+        sourceSessionTitle: session.title,
+        sourceSessionDeletedAt: new Date().toISOString(),
+      },
+    });
+  };
+
+  taskRows.forEach((task: any) => pushMemory({
+    sourceEntityType: 'task',
+    sourceEntityId: task.id,
+    memoryType: 'task_history',
+    title: `مهمة ${task.status || 'مسجلة'}: ${task.title}`,
+    content: `المهمة: ${task.title}. المكلف: ${task.assignee || 'غير محدد'}. الحالة: ${task.status || 'PENDING'}. الوصف: ${task.description || 'لا يوجد'}.`,
+    subject: task.assignee || task.title,
+    importance: String(task.status || '').toUpperCase() === 'COMPLETED' ? 5 : 4,
+  }));
+
+  decisionRows.forEach((decision: any) => pushMemory({
+    sourceEntityType: 'decision',
+    sourceEntityId: decision.id,
+    memoryType: String(decision.status || '').toUpperCase() === 'RECOMMENDED' ? 'recommendation_history' : 'decision_history',
+    title: `${String(decision.status || '').toUpperCase() === 'RECOMMENDED' ? 'توصية' : 'قرار'}: ${decision.title}`,
+    content: `${decision.title}. الحالة: ${decision.status || 'APPROVED'}. الوصف: ${decision.description || 'لا يوجد'}.`,
+    subject: decision.title,
+    importance: 4,
+  }));
+
+  riskRows.forEach((risk: any) => pushMemory({
+    sourceEntityType: 'risk',
+    sourceEntityId: risk.id,
+    memoryType: 'risk_history',
+    title: `خطر ${risk.status || 'مسجل'}: ${risk.title}`,
+    content: `${risk.title}. المستوى: ${risk.riskLevel || risk.severity || 'غير مصنف'}. الحالة: ${risk.status || 'OPEN'}. الوصف: ${risk.description || 'لا يوجد'}.`,
+    subject: risk.title,
+    importance: 4,
+  }));
+
+  violationRows.forEach((violation: any) => pushMemory({
+    sourceEntityType: 'violation',
+    sourceEntityId: violation.id,
+    memoryType: 'violation_history',
+    title: `مخالفة/شبهة ${violation.status || 'مسجلة'}: ${violation.title}`,
+    content: `${violation.title}. الحالة: ${violation.status || 'SUSPECTED'}. الشدة: ${violation.severity || 'MEDIUM'}. السند: ${violation.regulationRef || violation.regulationTitle || 'غير محدد'}. الدليل: ${violation.factualEvidence || 'غير محدد'}. الإجراء: ${violation.correctiveAction || 'غير محدد'}.`,
+    subject: violation.title,
+    importance: 5,
+  }));
+
+  findingRows.forEach((finding: any) => pushMemory({
+    sourceEntityType: 'expert_finding',
+    sourceEntityId: finding.id,
+    memoryType: 'finding_history',
+    title: `ملاحظة خبير: ${finding.title}`,
+    content: `${finding.title}. النوع: ${finding.findingType || 'عام'}. الحالة: ${finding.status || 'OPEN'}. الشدة: ${finding.severity || 'INFO'}. الوصف: ${finding.description || 'لا يوجد'}. الدليل: ${finding.evidence || 'غير محدد'}.`,
+    subject: finding.title,
+    importance: 4,
+  }));
+
+  eventRows
+    .filter((event: any) => /PARTICIPANT|MEMBER|حضور|مشارك|participant/i.test(String(event.eventType || event.title || '')))
+    .slice(0, 20)
+    .forEach((event: any) => pushMemory({
+      sourceEntityType: 'meeting_event',
+      sourceEntityId: event.id,
+      memoryType: 'participant_memory',
+      title: `حضور/مشارك: ${event.title}`,
+      content: `${event.title}. التفاصيل: ${JSON.stringify(event.payload || {})}`,
+      subject: event.title,
+      importance: 3,
+    }));
+
+  extractDurableFactsFromMessages(messageRows).forEach((fact) => pushMemory({
+    ...fact,
+    sourceEntityType: 'message_fact',
+  }));
+
+  if (values.length > 0) {
+    await tx.insert(institutionalMemoryEntries).values(values.slice(0, 120));
+  }
+}
+
 export async function deleteSession(sessionId: number) {
   const sId = Number(sessionId);
   if (!sId || Number.isNaN(sId)) return;
