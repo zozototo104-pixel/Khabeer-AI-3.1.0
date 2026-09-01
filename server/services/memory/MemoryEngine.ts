@@ -141,6 +141,53 @@ export class MemoryEngine {
       .slice(0, limitCount);
   }
 
+  async getHistoricalTasks(organizationId: number, limitCount: number = 10, activeSessionIds?: Set<number>): Promise<any[]> {
+    const rows = await db.select()
+      .from(tasks)
+      .where(eq(tasks.orgId, organizationId))
+      .orderBy(desc(tasks.createdAt))
+      .limit(limitCount * 5);
+    const active = activeSessionIds || await this.getActiveSessionIdSet(organizationId);
+    return this.keepOnlyActiveSessionScopedRows(rows, active)
+      .filter((row) => String(row.status || '').toUpperCase() === 'COMPLETED')
+      .slice(0, limitCount);
+  }
+
+  async getHistoricalClosedRisks(organizationId: number, limitCount: number = 8, activeSessionIds?: Set<number>): Promise<any[]> {
+    const rows = await db.select()
+      .from(risks)
+      .where(eq(risks.orgId, organizationId))
+      .orderBy(desc(risks.updatedAt))
+      .limit(limitCount * 5);
+    const active = activeSessionIds || await this.getActiveSessionIdSet(organizationId);
+    return this.keepOnlyActiveSessionScopedRows(rows, active)
+      .filter((row) => !row.deletedAt && ['CLOSED', 'RESOLVED', 'ACCEPTED'].includes(String(row.status || '').toUpperCase()))
+      .slice(0, limitCount);
+  }
+
+  async getHistoricalClosedViolations(organizationId: number, limitCount: number = 8, activeSessionIds?: Set<number>): Promise<any[]> {
+    const rows = await db.select()
+      .from(violations)
+      .where(eq(violations.orgId, organizationId))
+      .orderBy(desc(violations.updatedAt))
+      .limit(limitCount * 5);
+    const active = activeSessionIds || await this.getActiveSessionIdSet(organizationId);
+    return this.keepOnlyActiveSessionScopedRows(rows, active)
+      .filter((row) => !row.deletedAt && ['CLOSED', 'RESOLVED', 'DISMISSED'].includes(String(row.status || '').toUpperCase()))
+      .slice(0, limitCount);
+  }
+
+  async getDurableInstitutionalMemories(organizationId: number, limitCount: number = 18): Promise<any[]> {
+    const rows = await db.select()
+      .from(institutionalMemoryEntries)
+      .where(eq(institutionalMemoryEntries.orgId, organizationId))
+      .orderBy(desc(institutionalMemoryEntries.importance), desc(institutionalMemoryEntries.updatedAt))
+      .limit(limitCount * 2);
+    return rows
+      .filter((row) => !row.deletedAt && String(row.status || '').toUpperCase() !== 'DELETED')
+      .slice(0, limitCount);
+  }
+
   async getOrganization(organizationId: number): Promise<any> {
     const results = await db.select().from(organizations).where(eq(organizations.id, organizationId)).limit(1);
     return results.length > 0 ? results[0] : null;
