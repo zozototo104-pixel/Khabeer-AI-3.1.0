@@ -6,7 +6,7 @@ import { getUserByUid } from '../../../src/db/users.ts';
 export class MemoryEngine {
   constructor() {}
 
-  private keepOnlyActiveSessionScopedRows<T extends { sessionId?: number | null; meetingId?: number | null }>(rows: T[], activeSessionIds: Set<number>): T[] {
+  private keepOnlyActiveSessionScopedRows<T extends Record<string, any>>(rows: T[], activeSessionIds: Set<number>): T[] {
     return rows.filter((row) => {
       const scopedSessionId = Number(row.sessionId ?? row.meetingId ?? 0);
       // Organization-level memory not attached to a session remains institutional.
