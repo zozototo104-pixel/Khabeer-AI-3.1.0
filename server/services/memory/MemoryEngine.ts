@@ -240,13 +240,28 @@ export class MemoryEngine {
       if (org?.pastMeetings) payload += `\n=== ملخص اجتماعات سابقة يدوية ===\n${org.pastMeetings}\n`;
 
       const activeSessionIds = await this.getActiveSessionIdSet(organizationId);
-      const [approvedDecisions, openRecommendations, pendingTasks, openRisks, openViolations, openFindings] = await Promise.all([
+      const [
+        approvedDecisions,
+        openRecommendations,
+        pendingTasks,
+        openRisks,
+        openViolations,
+        openFindings,
+        completedTasks,
+        closedRisks,
+        closedViolations,
+        durableMemories,
+      ] = await Promise.all([
         this.getRecentApprovedDecisions(organizationId, 5, activeSessionIds),
         this.getOpenRecommendations(organizationId, 8, activeSessionIds),
         this.getPendingTasks(organizationId, activeSessionIds),
         this.getOpenRisks(organizationId, 8, activeSessionIds),
         this.getOpenViolations(organizationId, 8, activeSessionIds),
         this.getOpenExpertFindings(organizationId, 8, activeSessionIds),
+        this.getHistoricalTasks(organizationId, 10, activeSessionIds),
+        this.getHistoricalClosedRisks(organizationId, 8, activeSessionIds),
+        this.getHistoricalClosedViolations(organizationId, 8, activeSessionIds),
+        this.getDurableInstitutionalMemories(organizationId, 18),
       ]);
       
       payload += `\n=== القرارات المعتمدة مؤخراً عبر النظام ===\n`;
