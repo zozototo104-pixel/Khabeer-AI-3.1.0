@@ -668,7 +668,7 @@ const [currentTab, setCurrentTab] = useState<'chat' | 'dashboard' | 'knowledge' 
       <ConfirmModal
         isOpen={!!sessionToDelete}
         title="حذف المحادثة / الجلسة"
-        message={`هل أنت متأكد من رغبتك في حذف "${sessionToDelete?.title}"؟ سيتم مسح سجل المحادثات والرسائل والقرارات الخاصة بها نهائياً.`}
+        message={buildSessionDeleteMessage()}
         confirmText="تأكيد الحذف"
         cancelText="إلغاء"
         isDestructive={true}
