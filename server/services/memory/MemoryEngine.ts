@@ -1,5 +1,5 @@
 import { db } from '../../../src/db/index.ts';
-import { decisions, tasks, organizations, users, risks, violations, expertFindings, sessions } from '../../../src/db/schema.ts';
+import { decisions, tasks, organizations, users, risks, violations, expertFindings, sessions, institutionalMemoryEntries } from '../../../src/db/schema.ts';
 import { eq, desc, not, and } from 'drizzle-orm';
 import { getUserByUid } from '../../../src/db/users.ts';
 
