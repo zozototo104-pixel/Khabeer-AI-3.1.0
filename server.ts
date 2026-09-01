@@ -5341,7 +5341,7 @@ console.log('✅ Tasks database schema is ready.');
       const taskId = parseInt(req.params.id);
       const { status, title, description, assignee, deliverable, deliverableType, dueDate, priority } = req.body;
       const { db } = await import('./src/db/index.ts');
-      const { tasks } = await import('./src/db/schema.ts');
+      const { tasks, institutionalMemoryEntries } = await import('./src/db/schema.ts');
       const { and, eq } = await import('drizzle-orm');
       const org = await resolveOwnedOrganization(req.user.uid, req.body.orgId);
       if (!org) return res.status(404).json({ error: 'Organization not found' });
