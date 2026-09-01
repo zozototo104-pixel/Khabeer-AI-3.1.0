@@ -5171,6 +5171,28 @@ console.log('✅ Tasks database schema is ready.');
         dueDate: req.body?.dueDate ? new Date(req.body.dueDate) : current.dueDate,
         updatedAt: new Date(),
       }).where(and(eq(violations.id, violationId), eq(violations.orgId, org.id))).returning();
+      if (['CONFIRMED', 'DISMISSED', 'REMEDIATED'].includes(requestedStatus)) {
+        await db.insert(institutionalMemoryEntries).values({
+          orgId: org.id,
+          sourceSessionId: current.sessionId || null,
+          sourceEntityType: 'violation_review',
+          sourceEntityId: String(violationId),
+          memoryType: 'violation_history',
+          title: `مخالفة/شبهة ${requestedStatus}: ${current.title}`,
+          content: [
+            `العنوان: ${current.title}`,
+            `الحالة السابقة: ${current.status || 'غير محددة'}`,
+            `الحالة الجديدة: ${requestedStatus}`,
+            `الإجراء التصحيحي: ${String(req.body?.correctiveAction ?? current.correctiveAction ?? 'غير محدد')}`,
+            `المسؤول/المالك: ${String(req.body?.owner ?? current.owner ?? 'غير محدد')}`,
+            `التحليل: ${String(req.body?.professionalAnalysis ?? current.professionalAnalysis ?? 'غير محدد')}`,
+          ].join('. '),
+          subject: current.title,
+          importance: requestedStatus === 'REMEDIATED' ? 5 : 4,
+          status: 'ACTIVE',
+          metadata: { reviewedByUid: req.user.uid, previousStatus: current.status, status: requestedStatus },
+        });
+      }
       if (current.sessionId) await appendMeetingEvent({
         sessionId: current.sessionId,
         orgId: org.id,
