@@ -18,9 +18,9 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate, test, and build
+    name: Inspect, test, build, and containerize
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
 
     steps:
       - name: Check out source and LFS models
@@ -28,14 +28,48 @@ jobs:
         with:
           lfs: true
 
-      - name: Ensure LFS objects are available
-        run: git lfs pull
+      - name: Inspect repository and runner environment
+        run: |
+          echo "PWD=$(pwd)"
+          echo "GITHUB_REF=$GITHUB_REF"
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          git status --short --branch
+          git branch --show-current || true
+          echo "--- Root files ---"
+          ls -la
+          echo "--- Project structure depth 2 ---"
+          find . -maxdepth 2 -type f \
+            ! -path './node_modules/*' \
+            ! -path './.git/*' \
+            | sort \
+            | sed 's#^./##' \
+            | head -250
+          echo "--- Build-related files ---"
+          ls -la package.json package-lock.json tsconfig.json vite.config.* Dockerfile 2>/dev/null || true
 
-      - name: Set up Node.js
+      - name: Ensure LFS objects are available
+        run: |
+          git lfs version
+          git lfs pull
+
+      - name: Set up Node.js from package engines
         uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: npm
+
+      - name: Inspect runtime versions
+        run: |
+          node --version
+          npm --version
+          python3 --version || true
+          pip3 --version || true
+          echo "--- package engines ---"
+          node -e "const p=require('./package.json'); console.log(JSON.stringify(p.engines || {}, null, 2));"
+          echo "--- package manager lockfiles ---"
+          ls -la package-lock.json pnpm-lock.yaml yarn.lock 2>/dev/null || true
+          echo "--- package scripts ---"
+          node -e "const p=require('./package.json'); console.log(JSON.stringify(p.scripts || {}, null, 2));"
 
       - name: Install locked dependencies
         run: npm ci
@@ -56,3 +90,9 @@ jobs:
 
       - name: Build production container
         run: docker build --tag smart-expert-enterprise:ci .
+
+      - name: Final git diff guard
+        if: always()
+        run: |
+          git status --short --branch
+          git diff --stat || true
