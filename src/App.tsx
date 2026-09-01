@@ -161,6 +161,50 @@ const [currentTab, setCurrentTab] = useState<'chat' | 'dashboard' | 'knowledge' 
     }
   };
 
+  const requestDeleteSession = async (session: { id: number; title: string }) => {
+    setSessionToDelete(session);
+    setSessionDeleteImpact(null);
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/delete-impact`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setSessionDeleteImpact(await res.json());
+      }
+    } catch (e) {
+      console.warn('Failed to load session delete impact:', e);
+    }
+  };
+
+  const buildSessionDeleteMessage = () => {
+    const title = sessionToDelete?.title || '';
+    const willDelete = sessionDeleteImpact?.willDelete || {};
+    const preserved = sessionDeleteImpact?.willPreserveAsDurableMemory || {};
+    return [
+      `هل تريد تأكيد حذف الجلسة "${title}"؟`,
+      '',
+      'سيتم حذف ذاكرة الجلسة الخام وما يرتبط بها:',
+      `- الرسائل: ${willDelete.messages ?? '...'}`,
+      `- المحضر وجدول الأعمال: ${(willDelete.minutes ?? 0) + (willDelete.agenda ?? 0)}`,
+      `- القرارات: ${willDelete.decisions ?? '...'}`,
+      `- التوصيات: ${willDelete.recommendations ?? '...'}`,
+      `- المهام والتكليفات: ${willDelete.tasks ?? '...'}`,
+      `- المخاطر: ${willDelete.risks ?? '...'}`,
+      `- المخالفات: ${willDelete.violations ?? '...'}`,
+      `- ملاحظات الخبراء: ${willDelete.expertFindings ?? '...'}`,
+      `- الحضور/المشاركون: ${willDelete.participants ?? '...'}`,
+      '',
+      'وسيتم حفظ ذاكرة مؤسسية مختصرة للأمور المهمة قبل الحذف:',
+      `- المهام المنجزة: ${preserved.completedTasks ?? '...'}`,
+      `- القرارات والتوصيات المهمة: ${preserved.decisionsAndRecommendations ?? '...'}`,
+      `- المخاطر/المخالفات المغلقة: ${(preserved.closedRisks ?? 0) + (preserved.closedViolations ?? 0)}`,
+      '- حقائق مهمة مثل الأشخاص/الأدوار/الأسعار عند اكتشافها.',
+      '',
+      'للحذف النهائي من ذاكرة الخبير بالكامل استخدم الزر الأحمر في الإعدادات.',
+    ].join('\n');
+  };
+
   const confirmDeleteSession = async () => {
     if (!sessionToDelete || !token) return;
     setIsDeletingSession(true);
