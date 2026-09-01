@@ -28,6 +28,7 @@ const [currentTab, setCurrentTab] = useState<'chat' | 'dashboard' | 'knowledge' 
 
   // Deletion modal state for sidebar
   const [sessionToDelete, setSessionToDelete] = useState<{ id: number; title: string } | null>(null);
+  const [sessionDeleteImpact, setSessionDeleteImpact] = useState<any | null>(null);
   const [isDeletingSession, setIsDeletingSession] = useState(false);
 
   // Notifications state
