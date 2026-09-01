@@ -73,6 +73,18 @@ const PERSONALITIES = [
   { value: 'creative', label: '✨ إبداعية' },
 ];
 
+const PURGE_CATEGORIES = [
+  { key: 'sessions', label: 'الجلسات والمحاضر والرسائل', danger: 'يحذف نصوص المحادثات والمحاضر وأحداث الاجتماعات المرتبطة بها.' },
+  { key: 'decisionsAndRecommendations', label: 'القرارات والتوصيات', danger: 'يحذف القرارات المعتمدة والتوصيات المفتوحة والتاريخية.' },
+  { key: 'tasks', label: 'المهام والتكليفات', danger: 'يحذف المهام المعلقة والمنجزة وسجل من قام بماذا.' },
+  { key: 'risks', label: 'المخاطر', danger: 'يحذف سجل المخاطر المفتوحة والمغلقة.' },
+  { key: 'violations', label: 'المخالفات وشبهات المخالفة', danger: 'يحذف السندات والدليل والإجراءات التصحيحية المسجلة.' },
+  { key: 'expertFindings', label: 'ملاحظات الخبراء', danger: 'يحذف ملاحظات الخبراء ونتائج التحليل المحفوظة.' },
+  { key: 'durableMemory', label: 'ذاكرة الخبير الطويلة الأمد', danger: 'يحذف الأشخاص والأدوار والأسعار والحقائق المهمة المؤرشفة.' },
+  { key: 'knowledge', label: 'قاعدة المعرفة والملفات المرفوعة', danger: 'يحذف النصوص المستخرجة والملفات الأصلية المرفوعة.' },
+  { key: 'speakerProfiles', label: 'البصمات الصوتية والأسماء', danger: 'يحذف بصمات المتحدثين وأسماءهم المسجلة.' },
+];
+
 export function loadAssistantSettings(): AssistantSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
