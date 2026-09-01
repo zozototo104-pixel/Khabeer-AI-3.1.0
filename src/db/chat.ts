@@ -335,9 +335,10 @@ export async function deleteSession(sessionId: number) {
   if (!sId || Number.isNaN(sId)) return;
   try {
     await db.transaction(async (tx) => {
-      // Full hard purge for session-scoped memory. Nothing produced inside this
-      // session should remain available to chat history, minutes, timeline, or
-      // institutional memory after deletion.
+      // Normal session deletion purges raw session memory, but first preserves
+      // durable institutional facts/history so the expert can still remember
+      // important people, completed tasks, decisions, prices, and closed cases.
+      await archiveDurableSessionMemory(tx, sId);
       await tx.delete(meetingInvites).where(eq(meetingInvites.sessionId, sId));
       await tx.delete(expertFindings).where(eq(expertFindings.sessionId, sId));
       await tx.delete(violations).where(eq(violations.sessionId, sId));
