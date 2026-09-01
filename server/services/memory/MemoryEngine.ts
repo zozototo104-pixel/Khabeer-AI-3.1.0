@@ -73,63 +73,70 @@ export class MemoryEngine {
       .limit(limitCount);
   }
 
-  async getRecentApprovedDecisions(organizationId: number, limitCount: number = 5): Promise<any[]> {
+  async getRecentApprovedDecisions(organizationId: number, limitCount: number = 5, activeSessionIds?: Set<number>): Promise<any[]> {
     const rows = await db.select()
       .from(decisions)
       .where(eq(decisions.orgId, organizationId))
       .orderBy(desc(decisions.createdAt))
-      .limit(limitCount * 3);
-    return rows
-      .filter((row) => String(row.status || '').toUpperCase() !== 'RECOMMENDED')
+      .limit(limitCount * 6);
+    const active = activeSessionIds || await this.getActiveSessionIdSet(organizationId);
+    return this.keepOnlyActiveSessionScopedRows(rows, active)
+      .filter((row) => !row.deletedAt && String(row.status || '').toUpperCase() !== 'RECOMMENDED')
       .slice(0, limitCount);
   }
 
-  async getOpenRecommendations(organizationId: number, limitCount: number = 8): Promise<any[]> {
+  async getOpenRecommendations(organizationId: number, limitCount: number = 8, activeSessionIds?: Set<number>): Promise<any[]> {
     const rows = await db.select()
       .from(decisions)
       .where(eq(decisions.orgId, organizationId))
       .orderBy(desc(decisions.createdAt))
-      .limit(limitCount * 3);
-    return rows
-      .filter((row) => ['RECOMMENDED', 'PROPOSED', 'PENDING_REVIEW'].includes(String(row.status || '').toUpperCase()))
+      .limit(limitCount * 6);
+    const active = activeSessionIds || await this.getActiveSessionIdSet(organizationId);
+    return this.keepOnlyActiveSessionScopedRows(rows, active)
+      .filter((row) => !row.deletedAt && ['RECOMMENDED', 'PROPOSED', 'PENDING_REVIEW'].includes(String(row.status || '').toUpperCase()))
       .slice(0, limitCount);
   }
 
-  async getPendingTasks(organizationId: number): Promise<any[]> {
-    return await db.select()
+  async getPendingTasks(organizationId: number, activeSessionIds?: Set<number>): Promise<any[]> {
+    const rows = await db.select()
       .from(tasks)
       .where(and(eq(tasks.orgId, organizationId), not(eq(tasks.status, 'COMPLETED'))));
+    const active = activeSessionIds || await this.getActiveSessionIdSet(organizationId);
+    return this.keepOnlyActiveSessionScopedRows(rows, active);
   }
 
-  async getOpenRisks(organizationId: number, limitCount: number = 8): Promise<any[]> {
+  async getOpenRisks(organizationId: number, limitCount: number = 8, activeSessionIds?: Set<number>): Promise<any[]> {
     const rows = await db.select()
       .from(risks)
       .where(eq(risks.orgId, organizationId))
       .orderBy(desc(risks.updatedAt))
-      .limit(limitCount * 2);
-    return rows
+      .limit(limitCount * 4);
+    const active = activeSessionIds || await this.getActiveSessionIdSet(organizationId);
+    return this.keepOnlyActiveSessionScopedRows(rows, active)
       .filter((row) => !row.deletedAt && !['CLOSED', 'RESOLVED', 'ACCEPTED'].includes(String(row.status || '').toUpperCase()))
       .slice(0, limitCount);
   }
 
-  async getOpenViolations(organizationId: number, limitCount: number = 8): Promise<any[]> {
+  async getOpenViolations(organizationId: number, limitCount: number = 8, activeSessionIds?: Set<number>): Promise<any[]> {
     const rows = await db.select()
       .from(violations)
       .where(eq(violations.orgId, organizationId))
       .orderBy(desc(violations.updatedAt))
-      .limit(limitCount * 2);
-    return rows
+      .limit(limitCount * 4);
+    const active = activeSessionIds || await this.getActiveSessionIdSet(organizationId);
+    return this.keepOnlyActiveSessionScopedRows(rows, active)
       .filter((row) => !row.deletedAt && !['CLOSED', 'RESOLVED', 'DISMISSED'].includes(String(row.status || '').toUpperCase()))
       .slice(0, limitCount);
   }
 
-  async getOpenExpertFindings(organizationId: number, limitCount: number = 8): Promise<any[]> {
+  async getOpenExpertFindings(organizationId: number, limitCount: number = 8, activeSessionIds?: Set<number>): Promise<any[]> {
     const rows = await db.select()
       .from(expertFindings)
       .where(eq(expertFindings.orgId, organizationId))
       .orderBy(desc(expertFindings.updatedAt))
-      .limit(limitCount * 2);
-    return rows
+      .limit(limitCount * 4);
+    const active = activeSessionIds || await this.getActiveSessionIdSet(organizationId);
+    return this.keepOnlyActiveSessionScopedRows(rows, active)
       .filter((row) => !row.deletedAt && !['CLOSED', 'RESOLVED', 'DISMISSED'].includes(String(row.status || '').toUpperCase()))
       .slice(0, limitCount);
   }
