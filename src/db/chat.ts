@@ -251,7 +251,7 @@ async function archiveDurableSessionMemory(tx: any, sessionId: number) {
   const pushMemory = (entry: any) => {
     if (!entry?.title || !entry?.content) return;
     values.push({
-      orgId: session.orgId,
+      orgId: archiveOrgId,
       sourceSessionId: sessionId,
       sourceEntityType: entry.sourceEntityType || 'session_archive',
       sourceEntityId: entry.sourceEntityId ? String(entry.sourceEntityId) : null,
