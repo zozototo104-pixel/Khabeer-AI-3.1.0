@@ -338,6 +338,41 @@ export class MemoryEngine {
         });
       }
 
+      payload += `\n=== سجل تاريخي مختصر للمهام المنجزة ===\n`;
+      if (completedTasks.length === 0) {
+        payload += `- لا توجد مهام منجزة محفوظة في السجل المختصر.\n`;
+      } else {
+        completedTasks.forEach((task) => {
+          payload += `- ${task.title} (المكلف: ${task.assignee || 'غير محدد'}، الحالة: ${task.status || 'COMPLETED'})\n`;
+          if (task.description) payload += `  التفاصيل: ${task.description}\n`;
+          if (task.deliverable) payload += `  ناتج التنفيذ: ${task.deliverable}\n`;
+        });
+      }
+
+      payload += `\n=== سجل تاريخي للمخاطر والمخالفات المغلقة ===\n`;
+      const closedItems = [
+        ...closedRisks.map((item) => ({ type: 'خطر', title: item.title, status: item.status, details: item.description || item.regulationRef || '' })),
+        ...closedViolations.map((item) => ({ type: 'مخالفة/شبهة', title: item.title, status: item.status, details: item.correctiveAction || item.factualEvidence || item.regulationRef || '' })),
+      ];
+      if (closedItems.length === 0) {
+        payload += `- لا توجد مخاطر أو مخالفات مغلقة محفوظة في السجل المختصر.\n`;
+      } else {
+        closedItems.slice(0, 12).forEach((item) => {
+          payload += `- ${item.type}: ${item.title} (الحالة: ${item.status || 'مغلقة'})\n`;
+          if (item.details) payload += `  التفاصيل/الإجراء: ${item.details}\n`;
+        });
+      }
+
+      payload += `\n=== ذاكرة مؤسسية طويلة الأمد من جلسات سابقة أو محذوفة ===\n`;
+      if (durableMemories.length === 0) {
+        payload += `- لا توجد ذاكرة طويلة الأمد مؤرشفة.\n`;
+      } else {
+        durableMemories.forEach((memory) => {
+          payload += `- ${memory.title} (النوع: ${memory.memoryType || 'fact'}، الأهمية: ${memory.importance ?? 3})\n`;
+          payload += `  ${memory.content}\n`;
+        });
+      }
+
       return payload;
     } catch (e) {
       console.error("Error fetching contextual memory:", e);
