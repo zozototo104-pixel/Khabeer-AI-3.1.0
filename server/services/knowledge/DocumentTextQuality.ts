@@ -110,6 +110,45 @@ function measureArabicWordQuality(text: string): {
   };
 }
 
+function measureFragmentedScannerArtifacts(text: string): {
+  fragmentedScannerArtifactMarkers: number;
+  shortLatinTokenRatio: number;
+  averageLatinTokenLength: number;
+} {
+  const latinTokens = text.match(/[A-Za-z]+/g) || [];
+  if (latinTokens.length === 0) {
+    return {
+      fragmentedScannerArtifactMarkers: 0,
+      shortLatinTokenRatio: 0,
+      averageLatinTokenLength: 0,
+    };
+  }
+
+  const normalizedTokens = latinTokens.map((token) => token.toLowerCase());
+  const totalLatinTokenLength = normalizedTokens.reduce((sum, token) => sum + token.length, 0);
+  const shortLatinTokens = normalizedTokens.filter((token) => token.length <= 3).length;
+  const averageLatinTokenLength = totalLatinTokenLength / Math.max(1, normalizedTokens.length);
+  const shortLatinTokenRatio = shortLatinTokens / Math.max(1, normalizedTokens.length);
+
+  // Some scanner/PDF extractors break the watermark into vertical shards such
+  // as "Cr / ea / te / d" and "Pr / o". Those fragments are not enough alone,
+  // but combined with a high short-token ratio they indicate non-content text.
+  const scannerFragments = new Set([
+    'created', 'scanner', 'pro', 'scan', 'sc', 'sca', 'can', 'ann', 'nne', 'ner',
+    'cre', 'cr', 'ea', 'te', 'ted', 'd', 'pr', 'ro', 'o',
+  ]);
+  const distinctFragments = new Set<string>();
+  for (const token of normalizedTokens) {
+    if (scannerFragments.has(token)) distinctFragments.add(token);
+  }
+
+  return {
+    fragmentedScannerArtifactMarkers: distinctFragments.size,
+    shortLatinTokenRatio,
+    averageLatinTokenLength,
+  };
+}
+
 export function assessDocumentTextQuality(
   input: unknown,
   options: DocumentTextQualityOptions = {},
