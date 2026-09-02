@@ -275,6 +275,17 @@ export function assessDocumentTextQuality(
     return reject('scanner_watermark_text_artifact');
   }
 
+  if (
+    fragmentedScannerArtifactMarkers >= 5
+    && shortLatinTokenRatio >= 0.62
+    && averageLatinTokenLength > 0
+    && averageLatinTokenLength <= 3.2
+    && latinCharacters >= 12
+    && arabicCharacters < Math.max(80, latinCharacters * 0.75)
+  ) {
+    return reject('fragmented_scanner_watermark_text_artifact');
+  }
+
   // Arabic Presentation Forms are legitimate Unicode glyph code points, but
   // native PDF extraction should normally return logical Arabic letters. A
   // substantial share of presentation-form glyphs indicates that the PDF's
