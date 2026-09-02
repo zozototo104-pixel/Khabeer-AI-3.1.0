@@ -259,17 +259,17 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
           textQuality: { usable: false, reason: 'document_processing_pending' },
         }
         : item));
-      if (previewDoc?.id === doc.id) {
-        setPreviewDoc({
-          ...previewDoc,
+      setPreviewDoc(current => current?.id === doc.id
+        ? {
+          ...current,
           content: '',
           processingStatus: 'PENDING',
           processingError: null,
           processedPages: 0,
           pageCount: null,
           textQuality: { usable: false, reason: 'document_processing_pending' },
-        });
-      }
+        }
+        : current);
       setStatusMessage({ type: 'success', text: data.message || 'تمت إعادة تشغيل OCR وسيتم تحديث المحتوى تلقائيًا.' });
       void fetchDocuments();
     } catch (e: any) {
