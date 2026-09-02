@@ -4257,7 +4257,9 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
           if (doc.processingStatus === 'PENDING' || doc.processingStatus === 'PROCESSING') return false;
           const content = String(doc.content || '').trim();
           if (!content || content === '[[PROCESSING_DOCUMENT]]') return false;
-          return assessDocumentTextQuality(content).reason === 'scanner_watermark_text_artifact';
+          return ['scanner_watermark_text_artifact', 'fragmented_scanner_watermark_text_artifact'].includes(
+            assessDocumentTextQuality(content).reason,
+          );
         })
         .map((doc) => Number(doc.id))
         .filter((id) => Number.isInteger(id) && id > 0);
