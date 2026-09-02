@@ -744,6 +744,22 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
                         </button>
                       )}
 
+                      {doc.hasOriginalFile
+                        && ((doc.mimeType || '').includes('pdf') || /\.pdf$/i.test(doc.fileName || doc.title || ''))
+                        && (doc.processingStatus === 'FAILED' || (!doc.content && doc.processingStatus !== 'PENDING' && doc.processingStatus !== 'PROCESSING') || doc.textQuality?.usable === false)
+                        && (
+                          <button
+                            type="button"
+                            onClick={() => void reprocessOcr(doc)}
+                            disabled={reprocessingDocId === doc.id || doc.processingStatus === 'PENDING' || doc.processingStatus === 'PROCESSING'}
+                            className="px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-300 text-xs font-medium flex items-center gap-1.5 transition-all disabled:opacity-50"
+                            title="إعادة استخراج النص من PDF الممسوح ضوئيًا عبر OCR"
+                          >
+                            {reprocessingDocId === doc.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                            <span>إعادة OCR</span>
+                          </button>
+                        )}
+
                       {/* Prominent Delete Button */}
                       <button 
                         type="button"
