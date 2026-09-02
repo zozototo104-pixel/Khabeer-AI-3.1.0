@@ -51,6 +51,7 @@ const CONTROL_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g;
 const PRIVATE_USE_RE = /[\uE000-\uF8FF]/g;
 const MOJIBAKE_RE = /(?:Ã.|Â.|Ø.|Ù.|â€|â€™|â€œ|â€\u009d|ï¿½|�)/g;
 const SCRIPT_TRANSITION_RE = /(?:[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff][A-Za-z]|[A-Za-z][\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff])/g;
+const SCANNER_ARTIFACT_RE = /(?:created\s+in\s+(?:scanner\s+pro|scanner|camscanner|adobe\s+scan)|scanned\s+with\s+camscanner|scanner\s+pro)/gi;
 
 // Characters commonly expected in Arabic/English business documents.
 // Anything outside this set is not automatically wrong, but a high ratio is
