@@ -9,6 +9,9 @@ test('knowledge list wakes durable OCR worker for pending scanned PDFs', () => {
   assert.match(server, /const hasPendingPdfJobs = docs\.some/);
   assert.match(server, /scheduleKnowledgeWorker\(250\)/);
   assert.match(server, /document_processing_pending/);
+  assert.match(server, /scanner_watermark_text_artifact/);
+  assert.match(server, /scanner_watermark_text_artifact_requeued_for_ocr/);
+  assert.match(server, /requeuedScannerArtifactIds/);
   assert.match(server, /content: isProcessingPlaceholder \? '' : doc\.content/);
 });
 
