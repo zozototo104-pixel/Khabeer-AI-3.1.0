@@ -144,6 +144,9 @@ export function assessDocumentTextQuality(
   } = measureArabicWordQuality(text);
   const readableArabicWordRatio = arabicWordRuns > 0 ? readableArabicWords / arabicWordRuns : 0;
   const isolatedArabicGlyphRatio = arabicWordRuns > 0 ? isolatedArabicGlyphs / arabicWordRuns : 0;
+  const scannerArtifactRatio = scannerArtifactMarkers > 0
+    ? (visibleCharacters - scannerArtifactRemainingVisibleCharacters) / Math.max(1, visibleCharacters)
+    : 0;
 
   let suspiciousSymbols = 0;
   for (const char of text) {
