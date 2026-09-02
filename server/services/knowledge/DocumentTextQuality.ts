@@ -166,6 +166,11 @@ export function assessDocumentTextQuality(
   const mojibakeMarkers = count(text, MOJIBAKE_RE);
   const scriptTransitions = count(text, SCRIPT_TRANSITION_RE);
   const scannerArtifactMarkers = count(text, SCANNER_ARTIFACT_RE);
+  const {
+    fragmentedScannerArtifactMarkers,
+    shortLatinTokenRatio,
+    averageLatinTokenLength,
+  } = measureFragmentedScannerArtifacts(text);
   const textWithoutScannerArtifacts = text.replace(SCANNER_ARTIFACT_RE, ' ');
   const scannerArtifactRemainingVisibleCharacters = count(textWithoutScannerArtifacts.trim(), /\S/g);
   const whitespaceCharacters = count(text, /\s/g);
