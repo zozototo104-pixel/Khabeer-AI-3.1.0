@@ -4250,10 +4250,35 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
         // the service restarted after the upload response but before the worker ran.
         scheduleKnowledgeWorker(250);
       }
+      const scannerArtifactPdfDocIds = docs
+        .filter((doc) => {
+          const isPdf = (doc.mimeType || '').includes('pdf') || /\.pdf$/i.test(doc.fileName || doc.title || '');
+          if (!isPdf || !doc.sha256 || doc.fileSize == null) return false;
+          if (doc.processingStatus === 'PENDING' || doc.processingStatus === 'PROCESSING') return false;
+          const content = String(doc.content || '').trim();
+          if (!content || content === '[[PROCESSING_DOCUMENT]]') return false;
+          return assessDocumentTextQuality(content).reason === 'scanner_watermark_text_artifact';
+        })
+        .map((doc) => Number(doc.id))
+        .filter((id) => Number.isInteger(id) && id > 0);
+      if (scannerArtifactPdfDocIds.length > 0) {
+        await db.update(dbKnowledge).set({
+          content: '[[PROCESSING_DOCUMENT]]',
+          processingStatus: 'PENDING',
+          processingError: null,
+          processedPages: 0,
+          pageCount: null,
+          updatedAt: new Date(),
+        }).where(and(eq(dbKnowledge.orgId, org.id), inArray(dbKnowledge.id, scannerArtifactPdfDocIds)));
+        ragEngine.invalidateOrganization(org.id);
+        scheduleKnowledgeWorker(250);
+      }
+      const requeuedScannerArtifactIds = new Set(scannerArtifactPdfDocIds);
       res.json(docs.map((doc) => {
-        const isProcessingPlaceholder = String(doc.content || '').trim() === '[[PROCESSING_DOCUMENT]]';
+        const wasRequeuedForScannerArtifact = requeuedScannerArtifactIds.has(Number(doc.id));
+        const isProcessingPlaceholder = wasRequeuedForScannerArtifact || String(doc.content || '').trim() === '[[PROCESSING_DOCUMENT]]';
         const quality = isProcessingPlaceholder
-          ? { usable: false, reason: 'document_processing_pending' }
+          ? { usable: false, reason: wasRequeuedForScannerArtifact ? 'scanner_watermark_text_artifact_requeued_for_ocr' : 'document_processing_pending' }
           : assessDocumentTextQuality(doc.content || '');
         return {
           ...doc,
