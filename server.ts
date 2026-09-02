@@ -4454,6 +4454,54 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
     }
   });
 
+  app.post('/api/knowledge/:id/reprocess', requireAuth, async (req: any, res) => {
+    try {
+      const docId = Number(req.params.id);
+      if (!Number.isInteger(docId) || docId <= 0) return res.status(400).json({ error: 'Valid document id required' });
+      const org = await resolveOwnedOrganization(req.user.uid, req.query.orgId ?? req.body?.orgId);
+      if (!org) return res.status(404).json({ error: 'Organization not found' });
+      const { db } = await import('./src/db/index.ts');
+      const { knowledge, knowledgeFiles } = await import('./src/db/schema.ts');
+      const { and, eq } = await import('drizzle-orm');
+
+      const rows = await db.select({
+        id: knowledge.id,
+        title: knowledge.title,
+        fileName: knowledgeFiles.fileName,
+        mimeType: knowledgeFiles.mimeType,
+        hasData: knowledgeFiles.id,
+      }).from(knowledge)
+        .innerJoin(knowledgeFiles, eq(knowledgeFiles.knowledgeId, knowledge.id))
+        .where(and(eq(knowledge.id, docId), eq(knowledge.orgId, org.id)))
+        .limit(1);
+      const doc = rows[0];
+      if (!doc) return res.status(404).json({ error: 'Document not found or original file missing' });
+      const isPdf = String(doc.mimeType || '').includes('pdf') || /\.pdf$/i.test(String(doc.fileName || doc.title || ''));
+      if (!isPdf) return res.status(400).json({ error: 'OCR reprocessing is available only for PDF documents' });
+
+      await db.update(knowledge).set({
+        content: '[[PROCESSING_DOCUMENT]]',
+        processingStatus: 'PENDING',
+        processingError: null,
+        processedPages: 0,
+        pageCount: null,
+        updatedAt: new Date(),
+      }).where(and(eq(knowledge.id, docId), eq(knowledge.orgId, org.id)));
+      ragEngine.invalidateOrganization(org.id);
+      scheduleKnowledgeWorker(250);
+      res.status(202).json({
+        success: true,
+        id: docId,
+        title: doc.title || doc.fileName,
+        processingStatus: 'PENDING',
+        message: 'تمت إعادة إدخال PDF في طابور OCR. ستظهر الصفحات المستخرجة تلقائياً بعد المعالجة.',
+      });
+    } catch (e) {
+      console.error('Reprocess knowledge OCR error:', e);
+      res.status(500).json({ error: 'Failed to reprocess document OCR' });
+    }
+  });
+
   app.delete('/api/knowledge/:id', requireAuth, async (req: any, res) => {
     try {
       const { db } = await import('./src/db/index.ts');
