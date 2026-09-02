@@ -4239,10 +4239,25 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
         .leftJoin(knowledgeFiles, eq(knowledgeFiles.knowledgeId, knowledge.id))
         .where(eq(knowledge.orgId, org.id))
         .orderBy(desc(knowledge.createdAt));
+      const hasPendingPdfJobs = docs.some((doc) =>
+        (doc.processingStatus === 'PENDING' || doc.processingStatus === 'PROCESSING')
+        && ((doc.mimeType || '').includes('pdf') || /\.pdf$/i.test(doc.fileName || doc.title || ''))
+        && Boolean(doc.sha256 && doc.fileSize != null),
+      );
+      if (hasPendingPdfJobs) {
+        // Viewing the Knowledge Base should also wake the durable OCR worker.
+        // This prevents scanned PDFs from staying as [[PROCESSING_DOCUMENT]] if
+        // the service restarted after the upload response but before the worker ran.
+        scheduleKnowledgeWorker(250);
+      }
       res.json(docs.map((doc) => {
-        const quality = assessDocumentTextQuality(doc.content || '');
+        const isProcessingPlaceholder = String(doc.content || '').trim() === '[[PROCESSING_DOCUMENT]]';
+        const quality = isProcessingPlaceholder
+          ? { usable: false, reason: 'document_processing_pending' }
+          : assessDocumentTextQuality(doc.content || '');
         return {
           ...doc,
+          content: isProcessingPlaceholder ? '' : doc.content,
           hasOriginalFile: Boolean(doc.sha256 && doc.fileSize != null),
           textQuality: {
             usable: quality.usable,
