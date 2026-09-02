@@ -1,0 +1,58 @@
+name: Knowledge OCR Fast Check
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'server.ts'
+      - 'server/services/knowledge/**'
+      - 'src/components/KnowledgeBase.tsx'
+      - 'tests/knowledge_scanned_pdf_reprocess.unit.test.ts'
+      - 'tests/document_text_quality_scanner_artifacts.unit.test.ts'
+      - '.github/workflows/knowledge-ocr-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: knowledge-ocr-fast-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  knowledge-ocr-fast-check:
+    name: TypeScript, tests, and build for scanned PDF OCR fixes
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Inspect runner
+        run: |
+          echo "PWD=$(pwd)"
+          git status --short --branch
+          node --version
+          npm --version
+          echo "--- package scripts ---"
+          node -e "const p=require('./package.json'); console.log(JSON.stringify(p.scripts || {}, null, 2));"
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Type-check project
+        run: npm run lint
+
+      - name: Run unit tests including scanned PDF OCR policy
+        run: npm run test:unit
+
+      - name: Build application
+        run: npm run build
