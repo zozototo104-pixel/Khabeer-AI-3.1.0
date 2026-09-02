@@ -211,6 +211,20 @@ export function assessDocumentTextQuality(
     return reject('suspected_mojibake');
   }
 
+  // Scanner apps often embed a repeated watermark/metadata string such as
+  // "Created in Scanner Pro" while the real page content remains only an
+  // image. Native PDF text extraction then looks non-empty, but it is useless
+  // for RAG. Reject it so the pipeline falls back to real OCR.
+  if (
+    scannerArtifactMarkers >= 2
+    && (
+      scannerArtifactRatio >= 0.35
+      || scannerArtifactRemainingVisibleCharacters < Math.max(40, pageCount * 12)
+    )
+  ) {
+    return reject('scanner_watermark_text_artifact');
+  }
+
   // Arabic Presentation Forms are legitimate Unicode glyph code points, but
   // native PDF extraction should normally return logical Arabic letters. A
   // substantial share of presentation-form glyphs indicates that the PDF's
