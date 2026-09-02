@@ -235,6 +235,50 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
     }
   };
 
+  const reprocessOcr = async (doc: KnowledgeDoc) => {
+    if (!doc.hasOriginalFile) return;
+    setReprocessingDocId(doc.id);
+    setStatusMessage(null);
+    try {
+      const activeToken = await getAuthToken() || propToken;
+      if (!activeToken) throw new Error('يرجى تسجيل الدخول أولاً');
+      const res = await fetch(`/api/knowledge/${doc.id}/reprocess?orgId=${encodeURIComponent(selectedOrgId)}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${activeToken}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'تعذر إعادة تشغيل OCR لهذا المستند');
+      setDocuments(prev => prev.map((item) => item.id === doc.id
+        ? {
+          ...item,
+          content: '',
+          processingStatus: 'PENDING',
+          processingError: null,
+          processedPages: 0,
+          pageCount: null,
+          textQuality: { usable: false, reason: 'document_processing_pending' },
+        }
+        : item));
+      if (previewDoc?.id === doc.id) {
+        setPreviewDoc({
+          ...previewDoc,
+          content: '',
+          processingStatus: 'PENDING',
+          processingError: null,
+          processedPages: 0,
+          pageCount: null,
+          textQuality: { usable: false, reason: 'document_processing_pending' },
+        });
+      }
+      setStatusMessage({ type: 'success', text: data.message || 'تمت إعادة تشغيل OCR وسيتم تحديث المحتوى تلقائيًا.' });
+      void fetchDocuments();
+    } catch (e: any) {
+      setStatusMessage({ type: 'error', text: e.message || 'تعذر إعادة تشغيل OCR.' });
+    } finally {
+      setReprocessingDocId(null);
+    }
+  };
+
   const downloadOriginal = async (doc: KnowledgeDoc) => {
     if (!doc.hasOriginalFile) return;
     setDownloadingDocId(doc.id);
