@@ -28,7 +28,7 @@ export interface DocumentTextQualityMetrics {
   averageLatinTokenLength: number;
   scannerArtifactRatio: number;
   scannerArtifactRemainingVisibleCharacters: number;
-  pageCount:
+  pageCount: number;
   charactersPerPage: number;
 }
 
