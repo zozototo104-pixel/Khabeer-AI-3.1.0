@@ -865,16 +865,41 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
               {previewDoc.textQuality && !previewDoc.textQuality.usable && (
                 <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-200 flex items-start gap-3">
                   <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                  <div>
-                    <div className="font-bold mb-1">النص المستخرج غير موثوق ولن يستخدمه الخبير.</div>
-                    <div className="text-amber-100/80">
-                      احذف هذا المرجع وأعد رفع ملف PDF الأصلي ليعمل مسار OCR الموثق على النسخة الجديدة.
+                  <div className="flex-1">
+                    <div className="font-bold mb-1">
+                      {previewDoc.processingStatus === 'PENDING' || previewDoc.processingStatus === 'PROCESSING'
+                        ? 'المستند محفوظ، والنص ما زال قيد استخراج OCR.'
+                        : 'النص المستخرج غير متاح أو غير موثوق ولن يستخدمه الخبير.'}
                     </div>
+                    <div className="text-amber-100/80 leading-6">
+                      {previewDoc.processingStatus === 'PENDING' || previewDoc.processingStatus === 'PROCESSING'
+                        ? 'انتظر اكتمال المعالجة؛ سيتم تحديث المحتوى تلقائيًا عند فتح قاعدة المعرفة.'
+                        : 'استخدم زر إعادة OCR لإعادة استخراج النص من الملف الأصلي المحفوظ دون الحاجة لحذفه وإعادة رفعه.'}
+                    </div>
+                    {previewDoc.hasOriginalFile
+                      && ((previewDoc.mimeType || '').includes('pdf') || /\.pdf$/i.test(previewDoc.fileName || previewDoc.title || ''))
+                      && previewDoc.processingStatus !== 'PENDING'
+                      && previewDoc.processingStatus !== 'PROCESSING'
+                      && (
+                        <button
+                          type="button"
+                          onClick={() => void reprocessOcr(previewDoc)}
+                          disabled={reprocessingDocId === previewDoc.id}
+                          className="mt-3 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/25 text-amber-100 text-xs font-bold inline-flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {reprocessingDocId === previewDoc.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                          <span>إعادة OCR من الملف الأصلي</span>
+                        </button>
+                      )}
                   </div>
                 </div>
               )}
               <div className="bg-slate-950 border border-slate-800/80 rounded-2xl p-4 text-xs font-mono text-slate-300 leading-relaxed whitespace-pre-wrap select-text max-h-[55vh] overflow-y-auto">
-                {previewDoc.content || 'لا يوجد نص مستخرج متاح لهذا المستند.'}
+                {previewDoc.content || (
+                  previewDoc.processingStatus === 'PENDING' || previewDoc.processingStatus === 'PROCESSING'
+                    ? 'المحتوى النصي لم يكتمل بعد. المستند الأصلي محفوظ وسيتم عرضه هنا بعد اكتمال OCR.'
+                    : 'لا يوجد نص مستخرج متاح لهذا المستند. جرّب إعادة OCR من الملف الأصلي.'
+                )}
               </div>
             </div>
 
