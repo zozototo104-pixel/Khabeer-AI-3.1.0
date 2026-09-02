@@ -37,6 +37,7 @@ export default function KnowledgeBase({ token: propToken }: KnowledgeBaseProps) 
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [downloadingDocId, setDownloadingDocId] = useState<number | null>(null);
+  const [reprocessingDocId, setReprocessingDocId] = useState<number | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [documents, setDocuments] = useState<KnowledgeDoc[]>([]);
   const [organizations, setOrganizations] = useState<Array<{ id: number; name?: string }>>([]);
