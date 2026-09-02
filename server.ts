@@ -4283,6 +4283,9 @@ ${extractedText ? 'النص المستخرج:\n' + extractedText.substring(0, 30
         return {
           ...doc,
           content: isProcessingPlaceholder ? '' : doc.content,
+          processingStatus: wasRequeuedForScannerArtifact ? 'PENDING' : doc.processingStatus,
+          processingError: wasRequeuedForScannerArtifact ? null : doc.processingError,
+          processedPages: wasRequeuedForScannerArtifact ? 0 : doc.processedPages,
           hasOriginalFile: Boolean(doc.sha256 && doc.fileSize != null),
           textQuality: {
             usable: quality.usable,
