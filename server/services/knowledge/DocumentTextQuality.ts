@@ -23,9 +23,12 @@ export interface DocumentTextQualityMetrics {
   isolatedArabicGlyphRatio: number;
   suspiciousArabicWhitespaceGaps: number;
   scannerArtifactMarkers: number;
+  fragmentedScannerArtifactMarkers: number;
+  shortLatinTokenRatio: number;
+  averageLatinTokenLength: number;
   scannerArtifactRatio: number;
   scannerArtifactRemainingVisibleCharacters: number;
-  pageCount: number;
+  pageCount:
   charactersPerPage: number;
 }
 
