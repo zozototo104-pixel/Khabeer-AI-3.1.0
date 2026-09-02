@@ -178,6 +178,9 @@ export function assessDocumentTextQuality(
     isolatedArabicGlyphs,
     isolatedArabicGlyphRatio,
     suspiciousArabicWhitespaceGaps,
+    scannerArtifactMarkers,
+    scannerArtifactRatio,
+    scannerArtifactRemainingVisibleCharacters,
     pageCount,
     charactersPerPage,
   };
