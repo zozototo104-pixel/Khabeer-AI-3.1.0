@@ -123,6 +123,9 @@ export function assessDocumentTextQuality(
   const privateUseCharacters = count(text, PRIVATE_USE_RE);
   const mojibakeMarkers = count(text, MOJIBAKE_RE);
   const scriptTransitions = count(text, SCRIPT_TRANSITION_RE);
+  const scannerArtifactMarkers = count(text, SCANNER_ARTIFACT_RE);
+  const textWithoutScannerArtifacts = text.replace(SCANNER_ARTIFACT_RE, ' ');
+  const scannerArtifactRemainingVisibleCharacters = count(textWithoutScannerArtifacts.trim(), /\S/g);
   const whitespaceCharacters = count(text, /\s/g);
   const letters = arabicCharacters + latinCharacters;
   const arabicCharacterRatio = letters > 0 ? arabicCharacters / letters : 0;
